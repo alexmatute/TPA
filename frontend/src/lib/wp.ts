@@ -16,7 +16,7 @@ export function logWP(...args: any[]) {
     console.log("[WP]", ...args);
   }
 }
-
+/* ---------------- Works ---------------- */
 /** ==== Fetch helper con control de revalidate ==== */
 type FetchInitPlus = RequestInit & { revalidate?: number | false };
 

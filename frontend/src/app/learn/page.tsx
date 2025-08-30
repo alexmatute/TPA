@@ -9,7 +9,7 @@ import Privacy from "@/components/privacy";
 import SectionHeading from "@/components/SectionHeading";
 
 const PER_PAGE = 8;
-
+/* ---------------- works ---------------- */
 /* ---------------- utils ---------------- */
 const num = (v: unknown, d = 1) => {
   const n = Number(typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined);

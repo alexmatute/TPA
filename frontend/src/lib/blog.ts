@@ -21,7 +21,7 @@ type WPPost = {
   _embedded?: { ["wp:featuredmedia"]?: WPMedia[] };
 };
 
-
+/* ---------------- works ---------------- */
 const strip = (html = "") => html.replace(/<[^>]+>/g, "").trim();
 
 const toCard = (p: WPPost): WPCard => {
