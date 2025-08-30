@@ -1,0 +1,22 @@
+/* src/styles/globals.scss */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@use "./variables" as *;
+@use "./mixins" as *;
+
+/* Custom properties globales */
+:root {
+  --container: 72rem;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-lg: 0 18px 60px rgba(0,0,0,.08);
+}
+
+/* util opcional */
+.container {
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}

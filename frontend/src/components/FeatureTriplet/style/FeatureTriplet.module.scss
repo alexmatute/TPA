@@ -1,0 +1,24 @@
+/* Fondo que se adapta en desktop y se oculta en mobile */
+.wrap {
+  background-image: var(--ft-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-color: var(--color-gray-50);
+}
+
+@media (max-width: 768px) {
+  .wrap {
+    background-image: none !important;
+  }
+}
+
+/* Color verde del sistema para los svg inline */
+.wrap :global(svg) {
+  stroke: #00aa80;
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+

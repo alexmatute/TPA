@@ -1,0 +1,44 @@
+/* src/components/Navbar/style/Navbar.module.scss */
+@use "../../../styles/variables" as *;
+@use "../../../styles/mixins" as *;
+
+.root {
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: saturate(160%) blur(8px);
+  background: rgba(255,255,255,.85);
+  border-bottom: 1px solid rgba(15,23,42,.06);
+}
+
+.link {
+  position: relative; color: #374151;
+  transition: color .15s $ease-out;
+
+  &:hover { color: #0f172a; }
+
+  &:focus-visible { @include focus-ring; }
+
+  &::after {
+    content: ""; position: absolute; left: 0; bottom: -6px;
+    height: 2px; width: 0; background: $brand; transition: width .18s $ease-out;
+  }
+  &:hover::after { width: 100%; }
+}
+
+.dropdown {
+  @include shadow-card;
+  animation: menu .16s $ease-out both;
+  transform-origin: top center;
+  padding: .5rem;
+}
+
+@keyframes menu {
+  from { opacity: 0; transform: translateY(4px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.panel {
+  background: #fff;
+  color: #000;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" role="img" aria-label="Brand logo">
+  <title>Brand Logo</title>
+  <!-- Vector, no background. Change fill to your brand color if needed. -->
+  <g fill="#00A88F">
+    <!-- bottom left bar -->
+    <rect x="0" y="36" width="38" height="12"/>
+    <!-- top right bar -->
+    <rect x="62" y="12" width="38" height="12"/>
+    <!-- diagonal band -->
+    <polygon points="18,34 64,14 82,22 36,42"/>
+  </g>
+</svg>

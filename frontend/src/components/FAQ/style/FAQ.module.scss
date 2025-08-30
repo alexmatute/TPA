@@ -1,0 +1,87 @@
+/* src/components/FAQ/style/FAQ.module.scss */
+
+.root{
+  padding: 3.5rem 0;
+  /* antes: background: #f9fafb; */
+  background: #fff !important;   /* fuerza fondo claro */
+  position: relative;             /* necesario para z-index */
+  isolation: isolate;             /* corta overlays absolutos de secciones previas */
+  z-index: 1;
+}
+
+.container{ max-width: var(--container); margin: 0 auto; padding: 0 5.5rem; }
+
+/* título centrado y más grande */
+.heading{
+  margin: 0 auto 1.25rem;
+  text-align: center;
+  font-weight: 800;
+  color: #0f172a;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+}
+
+/* Línea decorativa opcional bajo el título */
+.heading::after {
+  content: "";
+  display: block;
+  width: 160px;
+  height: 4px;
+  margin: 14px auto 0;
+  border-radius: 999px;
+  background: #00aa80;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.item {
+  border: 1px solid rgba(2, 6, 23, 0.08);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.q {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 16px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.q:hover {
+  background: #f8fafc;              /* slate-50 */
+}
+
+.chev {
+  transition: transform .2s ease;
+  margin-left: 12px;
+  color: #00aa80;
+  font-size: x-large;
+}
+
+.rotate {
+  transform: rotate(180deg);
+}
+
+.a {
+  padding: 0 20px 18px 20px;
+  color: #475569;                    /* slate-600 */
+  font-size: 0.975rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 1024px) {
+  .root { padding: 80px 0; }
+  .heading { margin-bottom: 2.25rem; }
+}
+

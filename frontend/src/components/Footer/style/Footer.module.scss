@@ -1,0 +1,25 @@
+@use "../../../styles/variables" as *;
+
+.root { background: #f1f1f1; color: #333333; padding: 3rem 0 2rem; }
+.container { max-width: var(--container); margin: 0 auto; padding: 0 1.5rem; }
+.grid {
+  display: grid; gap: 2rem;
+  grid-template-columns: 1fr;
+  @media (min-width: 768px) { grid-template-columns: 1.5fr 2fr; }
+}
+.brand img { height: 60px; width: auto;}
+.blurb { margin-top: .75rem; color: #94a3b8; max-width: 28rem; }
+
+.cols { display: grid; gap: 1.25rem; grid-template-columns: repeat(3,1fr); }
+.h { color: #00aa80; font-weight: 700; margin-bottom: .5rem; font-size: x-large; }
+.cols a { color: #000; }
+.cols a:hover { color: #fff; }
+
+.bottom {
+  border-top: 1px solid rgba(255,255,255,.08);
+  margin-top: 2rem; padding-top: 1rem;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+}
+.links { display: inline-flex; gap: .75rem; }
+.links a { color: #cbd5e1; }
+.links a:hover { color: #fff; }
