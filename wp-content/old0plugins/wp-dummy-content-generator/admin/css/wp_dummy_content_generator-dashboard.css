@@ -1,0 +1,206 @@
+/**
+ * WP Dummy Content Generator - Dashboard Styles
+ */
+
+.wp_dummy_content_generator-dashboard {
+    max-width: 95%;
+    margin: 20px 0px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;    
+}
+
+.wp_dummy_content_generator-header {
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.wp_dummy_content_generator-header:before {
+    content: "\f513";
+    font-family: dashicons;
+    position: absolute;
+    right: -20px;
+    top: -20px;
+    font-size: 180px;
+    opacity: 0.1;
+    color: white;
+}
+
+.wp_dummy_content_generator-header h1 {
+    margin-top: 0;
+    color: white;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.wp_dummy_content_generator-description {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.wp_dummy_content_generator-features-section h2 {
+    font-size: 22px;
+    margin-bottom: 20px;
+    color: #23282d;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+}
+
+.wp_dummy_content_generator-features-section h2:before {
+    content: "\f348";
+    font-family: dashicons;
+    margin-right: 10px;
+    font-size: 24px;
+    color: #2271b1;
+}
+
+.wp_dummy_content_generator-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 30px;
+}
+
+.wp_dummy_content_generator-feature-card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    border: 1px solid #e2e4e7;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.wp_dummy_content_generator-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+}
+
+.feature-card-icon {
+    background: #f8f9fa;
+    padding: 20px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+}
+
+.feature-card-icon .dashicons {
+    font-size: 36px;
+    height: 36px;
+    width: 36px;
+    color: #2271b1;
+}
+
+.feature-card-heading {
+    font-size: 18px;
+    font-weight: 500;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    color: #23282d;
+}
+
+.feature-card-content {
+    padding: 20px;
+}
+
+.feature-card-content p {
+    margin-top: 0;
+    color: #50575e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.feature-card-action {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.feature-card-action a.button {
+    display: inline-block;
+    padding: 8px 16px;
+    width: 100%;
+    text-align: center;
+    font-weight: 500;
+    text-decoration: none;
+    position: relative;
+}
+
+.feature-card-action a.button:after {
+    content: "\f345";
+    font-family: dashicons;
+    margin-left: 5px;
+    font-size: 16px;
+    vertical-align: middle;
+}
+
+.wp_dummy_content_generator-info-card {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    display: flex;
+    gap: 20px;
+    border: 1px solid #e2e4e7;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+
+.info-card-icon .dashicons {
+    font-size: 40px;
+    height: 40px;
+    width: 40px;
+    color: #2271b1;
+}
+
+.info-card-content h2 {
+    margin-top: 0;
+    font-size: 20px;
+    color: #23282d;
+    display: flex;
+    align-items: center;
+}
+
+.info-card-content h2:before {
+    content: "\f534";
+    font-family: dashicons;
+    margin-right: 10px;
+    font-size: 22px;
+    color: #2271b1;
+}
+
+.info-card-content p {
+    color: #50575e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.info-highlight {
+    color: #2271b1;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f0f6fc;
+    border-radius: 4px;
+}
+
+.info-highlight:before {
+    content: "\f118";
+    font-family: dashicons;
+    margin-right: 10px;
+    font-size: 20px;
+    color: #2271b1;
+}
+
+@media (max-width: 782px) {
+    .wp_dummy_content_generator-feature-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .wp_dummy_content_generator-info-card {
+        flex-direction: column;
+    }
+} 

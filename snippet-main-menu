@@ -1,0 +1,30 @@
+<!-- wp:navigation {"overlayMenu":"mobile","layout":{"type":"flex","justifyContent":"left"}} -->
+	<!-- wp:navigation-submenu {"label":"Solutions","url":"#"} -->
+		<!-- wp:navigation-link {"label":"Overview","url":"/solutions","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Website Development","url":"/solutions/website-development","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"E-commerce","url":"/solutions/ecommerce","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Integrations & APIs","url":"/solutions/integrations","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Maintenance & Support","url":"/solutions/maintenance","kind":"custom","type":"custom"} /-->
+	<!-- /wp:navigation-submenu -->
+
+	<!-- wp:navigation-submenu {"label":"Company","url":"#"} -->
+		<!-- wp:navigation-link {"label":"About Us","url":"/company/about","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Our Team","url":"/company/team","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Careers","url":"/company/careers","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Contact","url":"/company/contact","kind":"custom","type":"custom"} /-->
+	<!-- /wp:navigation-submenu -->
+
+	<!-- wp:navigation-submenu {"label":"Resources","url":"#"} -->
+		<!-- wp:navigation-link {"label":"Documentation","url":"/resources/docs","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Case Studies","url":"/resources/case-studies","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Guides & Tutorials","url":"/resources/guides","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"FAQs","url":"/resources/faqs","kind":"custom","type":"custom"} /-->
+	<!-- /wp:navigation-submenu -->
+
+	<!-- wp:navigation-submenu {"label":"Learn","url":"#"} -->
+		<!-- wp:navigation-link {"label":"Blog Home","url":"/learn","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"Featured","url":"/learn?sort=newest","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"External API","url":"/learn#external","kind":"custom","type":"custom"} /-->
+		<!-- wp:navigation-link {"label":"All Posts","url":"/learn?page=1","kind":"custom","type":"custom"} /-->
+	<!-- /wp:navigation-submenu -->
+<!-- /wp:navigation -->

@@ -1,0 +1,19 @@
+{
+  "key": "group_featured_home",
+  "title": "Featured on Home",
+  "fields": [
+    { "key": "field_featured_eyebrow", "label": "Eyebrow", "name": "featured_eyebrow", "type": "text" },
+    { "key": "field_featured_heading", "label": "Heading", "name": "featured_heading", "type": "text" },
+    {
+      "key": "field_featured_posts",
+      "label": "Featured Posts",
+      "name": "featured_posts",
+      "type": "relationship",
+      "post_type": ["case-study","post"],
+      "filters": ["search","post_type"],
+      "return_format": "id",
+      "max": 12
+    }
+  ],
+  "location": [[{ "param": "page_template", "operator": "==", "value": "default" }]]
+}
