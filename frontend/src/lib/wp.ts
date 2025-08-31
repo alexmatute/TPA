@@ -1,43 +1,12 @@
 // src/lib/wp.ts
+import type { BlogPost } from "./types";
+import { stripTags } from "./utils";
 
-/** ==== Base URLs (acepta 2 env vars y normaliza) ==== */
-const RAW_BASE =
-  process.env.NEXT_PUBLIC_WP_BASE_URL ||
-  process.env.NEXT_PUBLIC_WP_BASE ||
-  "http://localhost:8080";
+/** ==== Bases ==== */
+const WP_BASE = process.env.NEXT_PUBLIC_WP_BASE || "http://localhost:8080";
+const API_BASE = `${WP_BASE}/wp-json`;
 
-export const WP_BASE = RAW_BASE.replace(/\/$/, "");
-export const API_BASE = `${WP_BASE}/wp-json`;
-
-/** Logger de desarrollo (no hace ruido en prod) */
-export function logWP(...args: any[]) {
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.log("[WP]", ...args);
-  }
-}
-/* ---------------- Works ---------------- */
-/** ==== Fetch helper con control de revalidate ==== */
-type FetchInitPlus = RequestInit & { revalidate?: number | false };
-
-async function fetchJSON<T>(path: string, init?: FetchInitPlus): Promise<T> {
-  const url = path.startsWith("http") ? path : `${WP_BASE}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    next: { revalidate: init?.revalidate ?? 60 }, // default: 60s
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `WP ${res.status} ${res.statusText} :: ${url} :: ${text.slice(0, 180)}`
-    );
-  }
-  return res.json() as Promise<T>;
-}
-
-/** ==== Utilidades ==== */
-export const strip = (html = "") => html.replace(/<[^>]+>/g, "").trim();
-
+/** ==== WordPress Media Type ==== */
 export type WPMedia = {
   id?: number;
   source_url?: string;
@@ -45,6 +14,20 @@ export type WPMedia = {
   media_details?: {
     sizes?: Record<string, { source_url: string; width: number; height: number }>;
   };
+};
+
+/** ==== WordPress Post Types ==== */
+export type WpPost = {
+  id: number;
+  date: string;
+  slug: string;
+  link?: string;
+  title: { rendered: string };
+  excerpt?: { rendered: string };
+  content?: { rendered: string };
+  sticky?: boolean;
+  featured_media?: number;
+  _embedded?: { ["wp:featuredmedia"]?: WPMedia[] };
 };
 
 export type WpPostLite = {
@@ -61,7 +44,40 @@ export type WpPostLite = {
   };
 };
 
-/** ==== Cover normalizado ==== */
+/** ==== Featured Card Type ==== */
+export type FeaturedCard = {
+  id: number;
+  href: string;
+  title: string;
+  excerpt: string;
+  imageUrl?: string;
+  imageAlt?: string;
+};
+
+/** ==== Utility Functions ==== */
+export const strip = (html = "") => html.replace(/<[^>]+>/g, "").trim();
+
+/** Logger de desarrollo (no hace ruido en prod) */
+export function logWP(...args: any[]) {
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[WP]", ...args);
+  }
+}
+
+/** ==== Fetch helper con control de revalidate ==== */
+async function fetchJSON<T>(
+  url: string,
+  opts: { revalidate?: number | false } = {}
+): Promise<T> {
+  const res = await fetch(url, {
+    next: typeof opts.revalidate === "number" ? { revalidate: opts.revalidate } : undefined,
+  });
+  if (!res.ok) throw new Error(`WP fetch failed: ${res.status} ${res.statusText} @ ${url}`);
+  return (await res.json()) as T;
+}
+
+/** ==== Cover/Media Helpers ==== */
 function pickBestSize(m?: WPMedia) {
   const sizes = m?.media_details?.sizes || {};
   const preferred = sizes["large"] || sizes["medium_large"] || sizes["medium"];
@@ -74,6 +90,11 @@ function pickBestSize(m?: WPMedia) {
   };
 }
 
+function wpCover(p: WpPost | WpPostLite) {
+  const m = p._embedded?.["wp:featuredmedia"]?.[0];
+  return m ? { url: m.source_url, alt: m.alt_text || null } : undefined;
+}
+
 export function withCover<T extends WpPostLite>(p: T) {
   const mediaArr = p._embedded?.["wp:featuredmedia"] || [];
   const media = Array.isArray(mediaArr) ? mediaArr[0] : undefined;
@@ -81,24 +102,54 @@ export function withCover<T extends WpPostLite>(p: T) {
   return { ...p, cover: cover.url ? cover : undefined };
 }
 
-/** ==== Card estándar (útil para grids/carruseles) ==== */
-export type FeaturedCard = {
-  id: number;
-  href: string;
-  title: string;
-  excerpt: string;
-  imageUrl?: string;
-  imageAlt?: string;
-};
+/** ==== Post Type Candidates ==== */
+function candidatesFor(type: "post" | "case-study" | "external") {
+  return type === "post" 
+    ? ["posts"] 
+    : type === "external"
+    ? ["external", "externals", "external-posts"]
+    : ["case-study", "case_study", "case-studies"];
+}
 
-export function toCard(p: WpPostLite): FeaturedCard {
+/** ==== Mapeos ==== */
+function toBlogPost(p: WpPost | WpPostLite): BlogPost {
+  return {
+    slug: p.slug || "",
+    source: "wp",
+    title: stripTags(p.title?.rendered || ""),
+    excerpt: stripTags(p.excerpt?.rendered || ""),
+    content: p.content?.rendered || null,
+    date: p.date || "",
+    cover: wpCover(p),
+    tags: [],
+  };
+}
+
+/** 👉 Export requerido por src/lib/blog.ts */
+export function wpToCard(p: WpPost, postType?: "post" | "case-study" | "external"): FeaturedCard {
+  const cover = wpCover(p);
+  // Para case-study, usar ruta simple /learn/slug en lugar de /learn/case-study/slug
+  const baseHref = `/learn/${p.slug}`;
+  return {
+    id: p.id,
+    href: baseHref,
+    title: stripTags(p.title?.rendered) || "",
+    excerpt: stripTags(p.excerpt?.rendered) || "",
+    imageUrl: cover?.url || undefined,
+    imageAlt: cover?.alt || undefined,
+  };
+}
+
+/** ==== Card estándar (útil para grids/carruseles) ==== */
+export function toCard(p: WpPostLite, postType?: "post" | "case-study" | "external"): FeaturedCard {
   const title = p.title?.rendered ?? "";
   const excerpt = strip(p.excerpt?.rendered ?? "");
-  const href = p.link || "";
+  // Todos los posts van a /learn/slug por ahora
+  const baseHref = `/learn/${p.slug || ""}`;
   const cover = withCover(p).cover;
   return {
     id: p.id,
-    href,
+    href: baseHref,
     title,
     excerpt,
     imageUrl: cover?.url,
@@ -120,15 +171,10 @@ export function normalizeIds(input: any): number[] {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
-/** ==== Resolución de base REST por tipo ==== */
-function candidatesFor(type: "post" | "case-study") {
-  return type === "post" ? ["posts"] : ["case-study", "case_study", "case-studies"];
-}
-
 /** ==== Fetch por IDs y tipo (preserva orden) ==== */
 export async function fetchPostsByIds<T = WpPostLite>(
   ids: number[],
-  type: "post" | "case-study" = "post",
+  type: "post" | "case-study" | "external" = "post",
   revalidate: number | false = 60
 ): Promise<T[]> {
   const unique = Array.from(new Set(ids)).filter(Boolean);
@@ -157,7 +203,7 @@ export async function fetchPostsByIds<T = WpPostLite>(
 /** ==== Fetch por IDs mezclando tipos (Relationship mixto) ==== */
 export async function fetchPostsByIdsMixed<T = WpPostLite>(
   ids: number[],
-  types: Array<"post" | "case-study"> = ["case-study", "post"],
+  types: Array<"post" | "case-study" | "external"> = ["case-study", "post"],
   revalidate: number | false = 60
 ): Promise<T[]> {
   if (!ids?.length) return [];
@@ -171,14 +217,42 @@ export async function fetchPostsByIdsMixed<T = WpPostLite>(
   return ids.map((id) => byId.get(id)).filter(Boolean) as T[];
 }
 
-/** ==== Featured (sticky / tag / category) ==== */
+/** ==== Listado básico de posts ==== */
+export async function listWpPosts(): Promise<BlogPost[]> {
+  try {
+    const data = await fetchJSON<WpPost[]>(
+      `${API_BASE}/wp/v2/posts?per_page=100&_embed=1`,
+      { revalidate: 60 }
+    );
+    return data.map(toBlogPost);
+  } catch {
+    return [];
+  }
+}
+
+/** ==== Post por slug (core) ==== */
+export async function getWpBySlug(slug: string): Promise<BlogPost | null> {
+  try {
+    const arr = await fetchJSON<WpPost[]>(
+      `${API_BASE}/wp/v2/posts?slug=${encodeURIComponent(slug)}&_embed=1&per_page=1`,
+      { revalidate: 60 }
+    );
+    const p = arr?.[0];
+    return p ? toBlogPost(p) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ==== Featured (opciones) ==== */
 type FeaturedOpts = {
-  type?: "post" | "case-study";
+  type?: "post" | "case-study" | "external";
   limit?: number;
   via?: "sticky" | "tag" | "category";
   tagSlug?: string;
-  category?: number | string;
+  category?: string | number;
   revalidate?: number | false;
+  requireFeaturedImage?: boolean; // Nueva opción para filtrar por imagen
 };
 
 export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
@@ -189,37 +263,50 @@ export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
     tagSlug = "featured",
     category = "featured",
     revalidate = 60,
+    requireFeaturedImage = false,
   } = opts;
 
   const base = `${API_BASE}/wp/v2/${candidatesFor(type)[0]}?_embed=1&per_page=${limit}`;
 
   async function trySticky() {
-    return fetchJSON<WpPostLite[]>(`${base}&sticky=true`, { revalidate }).catch(() => []);
-  }
-  async function tryTag() {
-    const tags = await fetchJSON<Array<{ id: number }>>(
-      `${API_BASE}/wp/v2/tags?slug=${encodeURIComponent(tagSlug)}&per_page=1`,
-      { revalidate }
-    ).catch(() => []);
-    const id = tags?.[0]?.id;
-    return id
-      ? fetchJSON<WpPostLite[]>(`${base}&tags=${id}`, { revalidate }).catch(() => [])
-      : [];
-  }
-  async function tryCategory() {
-    let catId: number | null = null;
-    if (typeof category === "number") {
-      catId = category;
-    } else {
-      const cats = await fetchJSON<Array<{ id: number }>>(
-        `${API_BASE}/wp/v2/categories?slug=${encodeURIComponent(category)}&per_page=1`,
-        { revalidate }
-      ).catch(() => []);
-      catId = cats?.[0]?.id ?? null;
+    try {
+      return await fetchJSON<WpPostLite[]>(`${base}&sticky=true`, { revalidate });
+    } catch {
+      return [];
     }
-    return catId
-      ? fetchJSON<WpPostLite[]>(`${base}&categories=${catId}`, { revalidate }).catch(() => [])
-      : [];
+  }
+
+  async function tryTag() {
+    try {
+      const tags = await fetchJSON<Array<{ id: number }>>(
+        `${API_BASE}/wp/v2/tags?slug=${encodeURIComponent(tagSlug)}&per_page=1`,
+        { revalidate }
+      );
+      const id = tags?.[0]?.id;
+      if (!id) return [];
+      return await fetchJSON<WpPostLite[]>(`${base}&tags=${id}`, { revalidate });
+    } catch {
+      return [];
+    }
+  }
+
+  async function tryCategory() {
+    try {
+      let catId: number | null = null;
+      if (typeof category === "number") {
+        catId = category;
+      } else {
+        const cats = await fetchJSON<Array<{ id: number }>>(
+          `${API_BASE}/wp/v2/categories?slug=${encodeURIComponent(category)}&per_page=1`,
+          { revalidate }
+        );
+        catId = cats?.[0]?.id ?? null;
+      }
+      if (!catId) return [];
+      return await fetchJSON<WpPostLite[]>(`${base}&categories=${catId}`, { revalidate });
+    } catch {
+      return [];
+    }
   }
 
   const order =
@@ -233,23 +320,43 @@ export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
 
   for (const fn of order) {
     const rows = await fn();
-    if (rows?.length) return rows;
+    if (rows?.length) {
+      // Filtrar por imagen si se requiere
+      if (requireFeaturedImage) {
+        const filtered = rows.filter(p => {
+          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+          return !!hasMedia;
+        });
+        if (filtered.length) return filtered;
+      } else {
+        return rows;
+      }
+    }
   }
   return [];
 }
 
 /** ==== Featured combinando tipos ==== */
 export async function fetchFeaturedAcrossTypes({
-  types = ["case-study", "post"] as Array<"case-study" | "post">,
+  types = ["case-study", "post"] as Array<"case-study" | "post" | "external">,
   limit = 8,
   via = "sticky" as "sticky" | "tag" | "category",
   tagSlug = "featured",
   category = "featured",
   revalidate = 60,
+  requireFeaturedImage = false,
 } = {}) {
   const bag: WpPostLite[] = [];
   for (const t of types) {
-    const rows = await fetchFeaturedPosts({ type: t, limit, via, tagSlug, category, revalidate });
+    const rows = await fetchFeaturedPosts({ 
+      type: t, 
+      limit, 
+      via, 
+      tagSlug, 
+      category, 
+      revalidate,
+      requireFeaturedImage: t === "external" ? true : requireFeaturedImage 
+    });
     bag.push(...rows);
   }
   const seen = new Set<number>();
@@ -264,28 +371,41 @@ export async function fetchFeaturedAcrossTypes({
   return out;
 }
 
-/** ==== Slug único ==== */
+/** ==== Slug único con tipo ==== */
 export async function fetchPostBySlug(
   slug: string,
-  type: "post" | "case-study" = "post",
+  type: "post" | "case-study" | "external" = "post",
   revalidate: number | false = 60
 ) {
-  const url = `${API_BASE}/wp/v2/${candidatesFor(type)[0]}?slug=${encodeURIComponent(
-    slug
-  )}&_embed=1&per_page=1`;
-  const rows = await fetchJSON<WpPostLite[]>(url, { revalidate }).catch(() => []);
-  return rows?.[0] ?? null;
+  try {
+    const url = `${API_BASE}/wp/v2/${candidatesFor(type)[0]}?slug=${encodeURIComponent(
+      slug
+    )}&_embed=1&per_page=1`;
+    const rows = await fetchJSON<WpPostLite[]>(url, { revalidate });
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
-/** ==== ACF Home (naming consistente) ==== */
+/** ==== ACF Home ==== */
 export async function fetchHomeACF(slug = "home") {
-  const url = `${API_BASE}/wp/v2/pages?slug=${encodeURIComponent(slug)}&_fields=acf`;
-  const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 }).catch(() => []);
-  return arr?.[0] ?? null;
+  try {
+    const url = `${API_BASE}/wp/v2/pages?slug=${encodeURIComponent(slug)}&_fields=acf`;
+    const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 });
+    return arr?.[0] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** ==== Menú con fallbacks ==== */
-export type WpMenuItem = { id?: number; title: string; url: string; children?: WpMenuItem[] };
+export type WpMenuItem = { 
+  id?: number; 
+  title: string; 
+  url: string; 
+  children?: WpMenuItem[] 
+};
 
 async function fetchMenuViaMU(location = "main") {
   const url = `${API_BASE}/site/v1/navigation/${encodeURIComponent(location)}`;
@@ -293,7 +413,6 @@ async function fetchMenuViaMU(location = "main") {
 }
 
 async function fetchMenuViaWpApiMenus(identifier = "main") {
-  // slug o id
   const path = Number.isNaN(Number(identifier))
     ? `menus/slug/${encodeURIComponent(identifier)}`
     : `menus/${identifier}`;
@@ -310,13 +429,12 @@ async function fetchMenuViaWpApiMenus(identifier = "main") {
       children: [],
     })),
   }));
-  return items;
+  return items as WpMenuItem[];
 }
 
 async function fetchMenuViaCore(location = "main") {
-  // si tu tema expone esta ruta; ajusta si usas otra
   const url = `${API_BASE}/menus/v1/locations/${encodeURIComponent(location)}`;
-  const data = await fetchJSON<any>(url, { revalidate: 0 });
+  const data = await fetchJSON<any>(url, { revalidate: 0 }).catch(() => null as any);
   if (!data?.items) return [];
   const toItem = (it: any): WpMenuItem => ({
     id: it.id,
@@ -324,7 +442,7 @@ async function fetchMenuViaCore(location = "main") {
     url: it.url,
     children: Array.isArray(it.children) ? it.children.map(toItem) : [],
   });
-  return data.items.map(toItem);
+  return (data.items as any[]).map(toItem);
 }
 
 export async function fetchMenuServer(locationOrId = "main") {
@@ -338,4 +456,131 @@ export async function fetchMenuServer(locationOrId = "main") {
     return await fetchMenuViaCore(locationOrId);
   } catch {}
   return [];
+}
+
+/** ==== Función específica para posts externos con imagen ==== */
+export async function fetchExternalPostsWithImage({
+  limit = 10,
+  via = "sticky" as "sticky" | "tag" | "category",
+  tagSlug = "featured",
+  category = "featured",
+  revalidate = 60,
+} = {}) {
+  // Intentar múltiples endpoints para external
+  const candidates = ["external", "externals", "external-posts", "external_posts"];
+  
+  for (const endpoint of candidates) {
+    try {
+      const url = `${API_BASE}/wp/v2/${endpoint}?per_page=${limit}&_embed=1`;
+      logWP(`Trying external endpoint: ${url}`);
+      
+      const data = await fetchJSON<WpPostLite[]>(url, { revalidate });
+      
+      if (Array.isArray(data) && data.length) {
+        // Filtrar solo los que tienen imagen predeterminada
+        const withImage = data.filter(p => {
+          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+          const hasFeaturedMedia = p.featured_media && p.featured_media > 0;
+          logWP(`Post ${p.id}: hasMedia=${!!hasMedia}, featured_media=${p.featured_media}`);
+          return hasMedia || hasFeaturedMedia;
+        });
+        
+        logWP(`Found ${withImage.length} external posts with images from ${endpoint}`);
+        return withImage;
+      }
+    } catch (error) {
+      logWP(`Failed to fetch from ${endpoint}:`, error);
+    }
+  }
+  
+  logWP('No external posts found in any endpoint');
+  return [];
+}
+
+/** ==== Listado de posts externos (solo con imagen) ==== */
+export async function listExternalPosts(): Promise<BlogPost[]> {
+  try {
+    const data = await fetchJSON<WpPost[]>(
+      `${API_BASE}/wp/v2/external?per_page=100&_embed=1`,
+      { revalidate: 60 }
+    );
+    // Filtrar solo los que tienen imagen predeterminada
+    const withImage = data.filter(p => {
+      const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+      return !!hasMedia;
+    });
+    return withImage.map(toBlogPost);
+  } catch {
+    // Fallback: intentar con otros endpoints
+    try {
+      const data = await fetchJSON<WpPost[]>(
+        `${API_BASE}/wp/v2/externals?per_page=100&_embed=1`,
+        { revalidate: 60 }
+      );
+      const withImage = data.filter(p => {
+        const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+        return !!hasMedia;
+      });
+      return withImage.map(toBlogPost);
+    } catch {
+      return [];
+    }
+  }
+}
+
+/** ==== Helpers para generar cards con tipo correcto ==== */
+export function toCardWithType(p: WpPostLite, type: "post" | "case-study" | "external"): FeaturedCard {
+  return toCard(p, type);
+}
+
+export function wpToCardWithType(p: WpPost, type: "post" | "case-study" | "external"): FeaturedCard {
+  return wpToCard(p, type);
+}
+
+/** ==== Fetch de case studies (automáticamente con ruta correcta) ==== */
+export async function fetchCaseStudies({
+  limit = 10,
+  via = "sticky" as "sticky" | "tag" | "category",
+  tagSlug = "featured",
+  category = "featured",
+  revalidate = 60,
+} = {}) {
+  const posts = await fetchFeaturedPosts({
+    type: "case-study",
+    limit,
+    via,
+    tagSlug,
+    category,
+    revalidate,
+  });
+  
+  // Usar ruta simple /learn/slug
+  return posts.map(p => toCard(p, "case-study"));
+}
+
+/** ==== Helper para debug de external posts ==== */
+export async function debugExternalPosts() {
+  logWP('=== Debugging External Posts ===');
+  
+  const candidates = ["external", "externals", "external-posts", "external_posts", "posts"];
+  
+  for (const endpoint of candidates) {
+    try {
+      const url = `${API_BASE}/wp/v2/${endpoint}?per_page=5&_embed=1`;
+      logWP(`Testing endpoint: ${url}`);
+      
+      const data = await fetchJSON<WpPostLite[]>(url, { revalidate: 0 });
+      
+      if (Array.isArray(data)) {
+        logWP(`✅ ${endpoint}: Found ${data.length} posts`);
+        data.forEach(p => {
+          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
+          const featuredMedia = p.featured_media;
+          logWP(`  Post ${p.id} (${p.slug}): featured_media=${featuredMedia}, embedded_media=${!!hasMedia}`);
+        });
+      }
+    } catch (error) {
+      logWP(`❌ ${endpoint}: Error -`, error);
+    }
+  }
 }

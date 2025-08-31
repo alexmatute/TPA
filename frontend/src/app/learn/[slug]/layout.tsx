@@ -13,9 +13,9 @@ export default function LearnPostLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <Navbar />        {/* usa tu menú actual (con su fetch interno si aplica) */}
-      <main className="mx-auto max-w-5xl px-4 pb-20">{children}</main>
-      <PrivacyBar />    {/* si tu footer ya incluye privacy, elimina esta línea */}
+      <main className="py-10 md:py-14 bg-white">{children}</main>
       <Footer />        {/* usa tu footer actual */}
+      <PrivacyBar />    {/* si tu footer ya incluye privacy, elimina esta línea */}
     </>
   );
 }

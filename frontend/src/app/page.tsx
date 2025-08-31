@@ -1,4 +1,6 @@
 import ProductTabs, { ProductTab } from "../components/ProductTabs";
+import { fetchExternalPosts, fetchPosts } from "@/lib/blog";
+import { fetchFeaturedPosts, toCard } from "@/lib/wp";
 import { fetchHomeACF, fetchMenuServer } from "@/lib/wp";
 
 import FAQ from "../components/FAQ";
@@ -9,6 +11,11 @@ import Hero from "../components/Hero";
 import Navbar from "../components/Navbar";
 import Privacy from "../components/privacy";
 import { featureTripletData } from "@/data/featureTriplet";
+
+export async function generateStaticParams() {
+  const slugs = await listAllSlugs();
+  return slugs.map((slug) => ({ slug }));
+}
 
 function getUrl(img?: string | { url?: string }) {
   if (!img) return undefined;
