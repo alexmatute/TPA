@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: wp_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./seed:/docker-entrypoint-initdb.d   # <-- importa seed al inicio
+    networks:
+      - wpnet
+
+  wordpress:
+    image: wordpress:latest
+    container_name: wp_app
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppassword
+      WORDPRESS_DB_NAME: wordpress
+      # Extra config para Codespaces o localhost
+      WORDPRESS_CONFIG_EXTRA: |
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+          $_SERVER['HTTPS'] = 'on';
+        }
+        define('FORCE_SSL_ADMIN', true);
+        define('COOKIE_DOMAIN', '');
+        define('WP_ENVIRONMENT_TYPE', 'local');
+        if (!defined('WP_HOME')) {
+          $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+          if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $scheme = 'https';
+          }
+          $host = $_SERVER['HTTP_HOST'] ?? 'localhost:8080';
+          define('WP_HOME',   $scheme . '://' . $host);
+          define('WP_SITEURL', WP_HOME);
+        }
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+    networks:
+      - wpnet
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: wp_phpmyadmin
+    restart: always
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: rootpassword
+    networks:
+      - wpnet
+
+volumes:
+  db_data:
+
+networks:
+  wpnet:
