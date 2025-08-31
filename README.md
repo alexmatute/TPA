@@ -378,3 +378,6 @@ Vercel cannot run those services or persist filesystem/database state.
 
 👉 To deploy: - Move WordPress to a public host - Point WP_BASE to its
 URL - Ensure no code assumes localhost or a writable FS
+
+# Wiki Documentation and structure Base of Knowledge 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/alexmatute/TPA)
