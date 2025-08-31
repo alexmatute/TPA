@@ -30,6 +30,41 @@ type Post = PostRef & {
   seoDescription?: string;
 };
 
+// ---- helpers locales ----
+const fmtDate = (iso?: string) => {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso || "";
+  }
+};
+
+// para evitar que <Image> crashee si el host no está en next.config.js
+const isAllowedHost = (url?: string) => {
+  if (!url) return false;
+  try {
+    const h = new URL(url).hostname;
+    return [
+      "futureoffounders.com",
+      "i0.wp.com",
+      "i1.wp.com",
+      "i2.wp.com",
+      "secure.gravatar.com",
+      "0.gravatar.com",
+      "1.gravatar.com",
+      "2.gravatar.com",
+      "localhost",
+    ].some((allowed) => h === allowed || h.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+};
+
 // ---- SSG ----
 export async function generateStaticParams() {
   const slugs = (await listAllSlugs?.()) || [];
@@ -85,6 +120,34 @@ export default async function LearnPostPage({ params }: { params: { slug: string
     post.coverImage ||
     undefined;
 
+  // -------- Derivar autor y fecha de forma robusta --------
+  const wpAny = post as any;
+
+  const authorAvatar =
+    post.author?.avatar ||
+    wpAny?.author?.avatar ||
+    wpAny?._embedded?.author?.[0]?.avatar_urls?.["96"] ||
+    wpAny?._embedded?.author?.[0]?.avatar_urls?.["48"] ||
+    undefined;
+
+  const authorName =
+    post.author?.name ||
+    wpAny?.author?.name ||
+    wpAny?._embedded?.author?.[0]?.name ||
+    "—";
+
+  const authorTitle =
+    post.author?.title ||
+    wpAny?.author?.title ||
+    wpAny?._embedded?.author?.[0]?.acf?.title ||
+    "";
+
+  const displayDate =
+    post.dateFormatted ||
+    fmtDate(post.date) ||
+    fmtDate(wpAny?.date) ||
+    "";
+
   const shareUrlBase = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "";
   const sharePath = `/learn/${post.slug}`;
   const shareUrl = `${shareUrlBase}${sharePath}` || sharePath;
@@ -116,24 +179,36 @@ export default async function LearnPostPage({ params }: { params: { slug: string
 
           <div className="mt-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {post.author?.avatar && (
-                <Image
-                  src={post.author.avatar}
-                  alt={post.author?.name || "Author"}
-                  width={40}
-                  height={40}
-                  className="rounded-full"
-                />
+              {authorAvatar && (
+                isAllowedHost(authorAvatar) ? (
+                  <Image
+                    src={authorAvatar}
+                    alt={authorName || "Author"}
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <img
+                    src={authorAvatar}
+                    alt={authorName || "Author"}
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )
               )}
               <div className="text-sm">
-                <div className="font-medium text-black">{post.author?.name || "—"}</div>
-                {post.author?.title && (
-                  <div className="text-black/70">{post.author.title}</div>
+                <div className="font-medium text-black">{authorName}</div>
+                {authorTitle && (
+                  <div className="text-black/70">{authorTitle}</div>
                 )}
               </div>
             </div>
             <div className="text-sm text-black/70">
-              {post.dateFormatted || post.date || ""}
+              {displayDate}
             </div>
           </div>
 
@@ -160,7 +235,6 @@ export default async function LearnPostPage({ params }: { params: { slug: string
         <article
           className={[
             "mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 mt-8",
-            // tipografía clara y colores a negro
             "prose prose-lg prose-neutral",
             "prose-headings:text-black prose-p:text-black prose-strong:text-black",
             "prose-li:text-black prose-blockquote:text-black",
@@ -205,13 +279,13 @@ export default async function LearnPostPage({ params }: { params: { slug: string
           </div>
         </div>
 
-        {/* Prev / Next (puedes dejar los verdes) */}
+        {/* Prev / Next */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 mt-14">
           <div className="flex items-center justify-between border-t pt-8">
             <div>
               {previous ? (
                 <Link
-                  href={`/learn/${previous.slug}`}
+                  href={`/learn/${(previous as any).slug}`}
                   className="group inline-flex items-center gap-2 text-emerald-700"
                 >
                   <span aria-hidden>←</span>
@@ -224,7 +298,7 @@ export default async function LearnPostPage({ params }: { params: { slug: string
             <div>
               {next ? (
                 <Link
-                  href={`/learn/${next.slug}`}
+                  href={`/learn/${(next as any).slug}`}
                   className="group inline-flex items-center gap-2 text-emerald-700"
                 >
                   <span className="group-hover:underline">Next Article</span>
@@ -237,7 +311,7 @@ export default async function LearnPostPage({ params }: { params: { slug: string
           </div>
         </div>
 
-        {/* Related (sin cambiar estilos principales) */}
+        {/* Related */}
         {related.length > 0 && (
           <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 mt-14 mb-16">
             <h2 className="text-2xl md:text-3xl font-semibold text-black">Related Articles</h2>

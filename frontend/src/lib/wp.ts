@@ -16,6 +16,13 @@ export type WPMedia = {
   };
 };
 
+/** ==== Author (embeds) ==== */
+type WpAuthor = {
+  name?: string;
+  acf?: { title?: string };
+  avatar_urls?: Record<string, string>; // "24","48","96"
+};
+
 /** ==== WordPress Post Types ==== */
 export type WpPost = {
   id: number;
@@ -27,7 +34,10 @@ export type WpPost = {
   content?: { rendered: string };
   sticky?: boolean;
   featured_media?: number;
-  _embedded?: { ["wp:featuredmedia"]?: WPMedia[] };
+  _embedded?: {
+    ["wp:featuredmedia"]?: WPMedia[];
+    author?: WpAuthor[];
+  };
 };
 
 export type WpPostLite = {
@@ -41,6 +51,7 @@ export type WpPostLite = {
   featured_media?: number;
   _embedded?: {
     ["wp:featuredmedia"]?: WPMedia[];
+    author?: WpAuthor[];
   };
 };
 
@@ -56,6 +67,19 @@ export type FeaturedCard = {
 
 /** ==== Utility Functions ==== */
 export const strip = (html = "") => html.replace(/<[^>]+>/g, "").trim();
+
+const fmtDate = (iso?: string) => {
+  if (!iso) return "";
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso || "";
+  }
+};
 
 /** Logger de desarrollo (no hace ruido en prod) */
 export function logWP(...args: any[]) {
@@ -92,20 +116,31 @@ function pickBestSize(m?: WPMedia) {
 
 function wpCover(p: WpPost | WpPostLite) {
   const m = p._embedded?.["wp:featuredmedia"]?.[0];
-  return m ? { url: m.source_url, alt: m.alt_text || null } : undefined;
+  if (!m) return undefined;
+  const best = pickBestSize(m);
+  return best.url ? best : undefined;
 }
 
-export function withCover<T extends WpPostLite>(p: T) {
-  const mediaArr = p._embedded?.["wp:featuredmedia"] || [];
-  const media = Array.isArray(mediaArr) ? mediaArr[0] : undefined;
-  const cover = pickBestSize(media);
-  return { ...p, cover: cover.url ? cover : undefined };
+/** ==== Author helper ==== */
+function wpAuthor(p: WpPost | WpPostLite) {
+  const a = p._embedded?.author?.[0];
+  if (!a) return undefined;
+  const avatar =
+    a.avatar_urls?.["96"] ||
+    a.avatar_urls?.["48"] ||
+    a.avatar_urls?.["24"] ||
+    undefined;
+  return {
+    name: a.name || "",
+    title: a.acf?.title || "",
+    avatar,
+  };
 }
 
 /** ==== Post Type Candidates ==== */
 function candidatesFor(type: "post" | "case-study" | "external") {
-  return type === "post" 
-    ? ["posts"] 
+  return type === "post"
+    ? ["posts"]
     : type === "external"
     ? ["external", "externals", "external-posts"]
     : ["case-study", "case_study", "case-studies"];
@@ -113,14 +148,20 @@ function candidatesFor(type: "post" | "case-study" | "external") {
 
 /** ==== Mapeos ==== */
 function toBlogPost(p: WpPost | WpPostLite): BlogPost {
+  const cover = wpCover(p);
+  const author = wpAuthor(p);
+  const date = (p as WpPost).date || (p as WpPostLite).date || "";
+
   return {
     slug: p.slug || "",
     source: "wp",
     title: stripTags(p.title?.rendered || ""),
     excerpt: stripTags(p.excerpt?.rendered || ""),
     content: p.content?.rendered || null,
-    date: p.date || "",
-    cover: wpCover(p),
+    date,
+    dateFormatted: fmtDate(date),
+    cover,
+    author, // <- ahora viene normalizado
     tags: [],
   };
 }
@@ -128,7 +169,7 @@ function toBlogPost(p: WpPost | WpPostLite): BlogPost {
 /** 👉 Export requerido por src/lib/blog.ts */
 export function wpToCard(p: WpPost, postType?: "post" | "case-study" | "external"): FeaturedCard {
   const cover = wpCover(p);
-  // Para case-study, usar ruta simple /learn/slug en lugar de /learn/case-study/slug
+  // Para case-study usamos /learn/slug (tu router ya lo espera así)
   const baseHref = `/learn/${p.slug}`;
   return {
     id: p.id,
@@ -142,16 +183,13 @@ export function wpToCard(p: WpPost, postType?: "post" | "case-study" | "external
 
 /** ==== Card estándar (útil para grids/carruseles) ==== */
 export function toCard(p: WpPostLite, postType?: "post" | "case-study" | "external"): FeaturedCard {
-  const title = p.title?.rendered ?? "";
-  const excerpt = strip(p.excerpt?.rendered ?? "");
-  // Todos los posts van a /learn/slug por ahora
   const baseHref = `/learn/${p.slug || ""}`;
-  const cover = withCover(p).cover;
+  const cover = wpCover(p);
   return {
     id: p.id,
     href: baseHref,
-    title,
-    excerpt,
+    title: stripTags(p.title?.rendered ?? ""),
+    excerpt: strip(p.excerpt?.rendered ?? ""),
     imageUrl: cover?.url,
     imageAlt: cover?.alt,
   };
@@ -252,7 +290,7 @@ type FeaturedOpts = {
   tagSlug?: string;
   category?: string | number;
   revalidate?: number | false;
-  requireFeaturedImage?: boolean; // Nueva opción para filtrar por imagen
+  requireFeaturedImage?: boolean;
 };
 
 export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
@@ -321,7 +359,6 @@ export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
   for (const fn of order) {
     const rows = await fn();
     if (rows?.length) {
-      // Filtrar por imagen si se requiere
       if (requireFeaturedImage) {
         const filtered = rows.filter(p => {
           const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
@@ -348,14 +385,14 @@ export async function fetchFeaturedAcrossTypes({
 } = {}) {
   const bag: WpPostLite[] = [];
   for (const t of types) {
-    const rows = await fetchFeaturedPosts({ 
-      type: t, 
-      limit, 
-      via, 
-      tagSlug, 
-      category, 
+    const rows = await fetchFeaturedPosts({
+      type: t,
+      limit,
+      via,
+      tagSlug,
+      category,
       revalidate,
-      requireFeaturedImage: t === "external" ? true : requireFeaturedImage 
+      requireFeaturedImage: t === "external" ? true : requireFeaturedImage,
     });
     bag.push(...rows);
   }
@@ -392,7 +429,7 @@ export async function fetchPostBySlug(
 export async function fetchHomeACF(slug = "home") {
   try {
     const url = `${API_BASE}/wp/v2/pages?slug=${encodeURIComponent(slug)}&_fields=acf`;
-    const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 });
+  const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 });
     return arr?.[0] ?? null;
   } catch {
     return null;
@@ -400,11 +437,11 @@ export async function fetchHomeACF(slug = "home") {
 }
 
 /** ==== Menú con fallbacks ==== */
-export type WpMenuItem = { 
-  id?: number; 
-  title: string; 
-  url: string; 
-  children?: WpMenuItem[] 
+export type WpMenuItem = {
+  id?: number;
+  title: string;
+  url: string;
+  children?: WpMenuItem[];
 };
 
 async function fetchMenuViaMU(location = "main") {
@@ -466,25 +503,23 @@ export async function fetchExternalPostsWithImage({
   category = "featured",
   revalidate = 60,
 } = {}) {
-  // Intentar múltiples endpoints para external
   const candidates = ["external", "externals", "external-posts", "external_posts"];
-  
+
   for (const endpoint of candidates) {
     try {
       const url = `${API_BASE}/wp/v2/${endpoint}?per_page=${limit}&_embed=1`;
       logWP(`Trying external endpoint: ${url}`);
-      
+
       const data = await fetchJSON<WpPostLite[]>(url, { revalidate });
-      
+
       if (Array.isArray(data) && data.length) {
-        // Filtrar solo los que tienen imagen predeterminada
         const withImage = data.filter(p => {
           const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
           const hasFeaturedMedia = p.featured_media && p.featured_media > 0;
           logWP(`Post ${p.id}: hasMedia=${!!hasMedia}, featured_media=${p.featured_media}`);
           return hasMedia || hasFeaturedMedia;
         });
-        
+
         logWP(`Found ${withImage.length} external posts with images from ${endpoint}`);
         return withImage;
       }
@@ -492,8 +527,8 @@ export async function fetchExternalPostsWithImage({
       logWP(`Failed to fetch from ${endpoint}:`, error);
     }
   }
-  
-  logWP('No external posts found in any endpoint');
+
+  logWP("No external posts found in any endpoint");
   return [];
 }
 
@@ -504,14 +539,12 @@ export async function listExternalPosts(): Promise<BlogPost[]> {
       `${API_BASE}/wp/v2/external?per_page=100&_embed=1`,
       { revalidate: 60 }
     );
-    // Filtrar solo los que tienen imagen predeterminada
     const withImage = data.filter(p => {
       const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
       return !!hasMedia;
     });
     return withImage.map(toBlogPost);
   } catch {
-    // Fallback: intentar con otros endpoints
     try {
       const data = await fetchJSON<WpPost[]>(
         `${API_BASE}/wp/v2/externals?per_page=100&_embed=1`,
@@ -532,7 +565,6 @@ export async function listExternalPosts(): Promise<BlogPost[]> {
 export function toCardWithType(p: WpPostLite, type: "post" | "case-study" | "external"): FeaturedCard {
   return toCard(p, type);
 }
-
 export function wpToCardWithType(p: WpPost, type: "post" | "case-study" | "external"): FeaturedCard {
   return wpToCard(p, type);
 }
@@ -553,24 +585,23 @@ export async function fetchCaseStudies({
     category,
     revalidate,
   });
-  
-  // Usar ruta simple /learn/slug
+
   return posts.map(p => toCard(p, "case-study"));
 }
 
 /** ==== Helper para debug de external posts ==== */
 export async function debugExternalPosts() {
-  logWP('=== Debugging External Posts ===');
-  
+  logWP("=== Debugging External Posts ===");
+
   const candidates = ["external", "externals", "external-posts", "external_posts", "posts"];
-  
+
   for (const endpoint of candidates) {
     try {
       const url = `${API_BASE}/wp/v2/${endpoint}?per_page=5&_embed=1`;
       logWP(`Testing endpoint: ${url}`);
-      
+
       const data = await fetchJSON<WpPostLite[]>(url, { revalidate: 0 });
-      
+
       if (Array.isArray(data)) {
         logWP(`✅ ${endpoint}: Found ${data.length} posts`);
         data.forEach(p => {

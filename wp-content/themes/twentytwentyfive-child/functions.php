@@ -156,3 +156,16 @@ if ( ! function_exists( 'twentytwentyfive_format_binding' ) ) :
 		}
 	}
 endif;
+
+// functions.php or plugin file
+register_post_type('case-study', [
+  'label' => 'Case Studies',
+  'public' => true,
+  'has_archive' => true,                   // archive page
+  'show_in_rest' => true,                  // ← required so /wp-json/wp/v2/case-study works
+  'supports' => ['title', 'editor', 'thumbnail', 'excerpt'],
+  'rewrite' => [
+    'slug' => 'learn/case-study',          // ← pretty URLs: /learn/case-study/{slug}
+    'with_front' => false,
+  ],
+]);
