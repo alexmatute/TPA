@@ -1,0 +1,57 @@
+@use "../../../styles/variables" as *;
+
+.root {
+  position: relative;
+  padding: 6rem 0;
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  opacity: .08; pointer-events: none;
+}
+
+.container {
+  position: relative;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  text-align: center;
+}
+
+.title {
+  font-size: clamp(2rem, 3.5vw + 1rem, 3.25rem);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 1rem auto 0;
+  max-width: 48rem;
+  color: #475569;
+  font-size: 1.125rem;
+}
+
+.ctas {
+  margin-top: 2rem;
+  display: inline-flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.primary {
+  background: $brand;
+  color: #fff; font-weight: 600;
+  padding: .625rem 1rem; border-radius: .6rem;
+  transition: background .15s $ease-out;
+  &:hover { background: $brand-600; }
+}
+
+.secondary {
+  border: 1px solid #e5e7eb;
+  color: #111827; background: #fff;
+  padding: .625rem 1rem; border-radius: .6rem; font-weight: 600;
+  &:hover { background: #f3f4f6; }
+}

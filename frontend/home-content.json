@@ -1,0 +1,212 @@
+[
+  {
+    "key": "group_home_content",
+    "title": "Home Content",
+    "fields": [
+      {
+        "key": "field_sections",
+        "label": "Sections",
+        "name": "sections",
+        "type": "flexible_content",
+        "button_label": "Add Section",
+        "layouts": [
+          {
+            "key": "layout_hero",
+            "name": "hero",
+            "label": "Hero",
+            "display": "block",
+            "sub_fields": [
+              {
+                "key": "field_hero_title",
+                "label": "Title",
+                "name": "title",
+                "type": "text",
+                "required": 0,
+                "wrapper": { "width": "", "class": "", "id": "" },
+                "default_value": "",
+                "placeholder": ""
+              },
+              {
+                "key": "field_hero_subtitle",
+                "label": "Subtitle",
+                "name": "subtitle",
+                "type": "textarea",
+                "required": 0,
+                "wrapper": { "width": "", "class": "", "id": "" },
+                "rows": 3,
+                "new_lines": "br",
+                "default_value": "",
+                "placeholder": ""
+              },
+              {
+                "key": "field_hero_primary",
+                "label": "Primary Button",
+                "name": "primary",
+                "type": "group",
+                "layout": "block",
+                "sub_fields": [
+                  {
+                    "key": "field_hero_primary_label",
+                    "label": "Label",
+                    "name": "label",
+                    "type": "text",
+                    "wrapper": { "width": 50, "class": "", "id": "" },
+                    "default_value": ""
+                  },
+                  {
+                    "key": "field_hero_primary_href",
+                    "label": "Href",
+                    "name": "href",
+                    "type": "url",
+                    "wrapper": { "width": 50, "class": "", "id": "" },
+                    "default_value": ""
+                  }
+                ]
+              },
+              {
+                "key": "field_hero_secondary",
+                "label": "Secondary Button",
+                "name": "secondary",
+                "type": "group",
+                "layout": "block",
+                "sub_fields": [
+                  {
+                    "key": "field_hero_secondary_label",
+                    "label": "Label",
+                    "name": "label",
+                    "type": "text",
+                    "wrapper": { "width": 50, "class": "", "id": "" },
+                    "default_value": ""
+                  },
+                  {
+                    "key": "field_hero_secondary_href",
+                    "label": "Href",
+                    "name": "href",
+                    "type": "url",
+                    "wrapper": { "width": 50, "class": "", "id": "" },
+                    "default_value": ""
+                  }
+                ]
+              },
+              {
+                "key": "field_hero_bg_image",
+                "label": "Background Image",
+                "name": "bg_image",
+                "type": "image",
+                "return_format": "url",
+                "preview_size": "medium",
+                "library": "all",
+                "wrapper": { "width": "", "class": "", "id": "" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "field_logos",
+        "label": "Logos",
+        "name": "logos",
+        "type": "repeater",
+        "button_label": "Add Logo",
+        "layout": "table",
+        "sub_fields": [
+          {
+            "key": "field_logo_image",
+            "label": "Image",
+            "name": "image",
+            "type": "image",
+            "return_format": "url",
+            "preview_size": "medium",
+            "library": "all",
+            "wrapper": { "width": 33, "class": "", "id": "" }
+          },
+          {
+            "key": "field_logo_alt",
+            "label": "Alt",
+            "name": "alt",
+            "type": "text",
+            "wrapper": { "width": 33, "class": "", "id": "" }
+          },
+          {
+            "key": "field_logo_href",
+            "label": "Link (optional)",
+            "name": "href",
+            "type": "url",
+            "wrapper": { "width": 34, "class": "", "id": "" }
+          }
+        ]
+      },
+      {
+        "key": "field_features",
+        "label": "Features",
+        "name": "features",
+        "type": "repeater",
+        "button_label": "Add Feature",
+        "layout": "row",
+        "sub_fields": [
+          {
+            "key": "field_feature_icon",
+            "label": "Icon (emoji or URL)",
+            "name": "icon",
+            "type": "text",
+            "wrapper": { "width": 25, "class": "", "id": "" }
+          },
+          {
+            "key": "field_feature_title",
+            "label": "Title",
+            "name": "title",
+            "type": "text",
+            "wrapper": { "width": 37, "class": "", "id": "" }
+          },
+          {
+            "key": "field_feature_description",
+            "label": "Description",
+            "name": "description",
+            "type": "textarea",
+            "rows": 3,
+            "new_lines": "br",
+            "wrapper": { "width": 38, "class": "", "id": "" }
+          }
+        ]
+      },
+      {
+        "key": "field_faqs",
+        "label": "FAQs",
+        "name": "faqs",
+        "type": "repeater",
+        "button_label": "Add FAQ",
+        "layout": "row",
+        "sub_fields": [
+          {
+            "key": "field_faq_question",
+            "label": "Question",
+            "name": "question",
+            "type": "text"
+          },
+          {
+            "key": "field_faq_answer",
+            "label": "Answer",
+            "name": "answer",
+            "type": "textarea",
+            "rows": 4,
+            "new_lines": "br"
+          }
+        ]
+      }
+    ],
+    "location": [
+      [
+        { "param": "post_type", "operator": "==", "value": "page" }
+      ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": "",
+    "active": true,
+    "description": "Home flexible content with Hero(s), Logos, Features and FAQs.",
+    "show_in_rest": 1
+  }
+]

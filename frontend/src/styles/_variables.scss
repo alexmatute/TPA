@@ -1,0 +1,15 @@
+// src/styles/_variables.scss
+$brand: #00aa80;
+$brand-600: #009272;
+$ink-900: #0b0f1a;
+$ink-700: #2b3137;
+$ink-600: #5b636a;
+
+$ease-out: cubic-bezier(.17,.67,.2,1);
+$ease-in: cubic-bezier(.4,0,.7,.2);
+
+$container: 72rem;
+$radius-lg: 16px;
+$radius-md: 12px;
+// sombras como token Sass si las quieres reutilizar
+$shadow-lg: 0 18px 60px rgba(0,0,0,.08);

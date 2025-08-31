@@ -1,0 +1,115 @@
+/* --- Barra oscura, full-bleed --- */
+.root {
+  background: #0b1220;
+  color: #e5e7eb;
+  padding-block: 3rem;          /* compacto */
+  border-top: 1px solid rgba(255,255,255,.06);
+
+  /* variable de gutter SCOPED al componente (reemplaza el :root anterior) */
+  --site-gutter: clamp(16px, 4vw, 48px);
+}
+
+.container {
+  /* full width + gutters */
+  width: 100%;
+  padding-inline: var(--site-gutter);
+
+  /* layout: izquierda (título+form) / derecha (links+copyright) */
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: 1fr;
+  align-items: center;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: 1fr auto; /* derecha se ajusta a su contenido */
+  }
+}
+
+.left { display: grid; gap: .55rem; min-width: 0; }
+
+.title {
+  margin: 0;
+  font-size: clamp(1rem, .85rem + .6vw, 1.25rem);
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+/* --- Form más pequeño --- */
+.form {
+  display: inline-flex;
+  align-items: stretch;
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  width: min(420px, 100%);     /* antes 520px */
+  box-shadow: 0 1px 0 rgba(0,0,0,.08);
+}
+
+.input {
+  flex: 1;
+  border: 0;
+  padding: .65rem .9rem;       /* antes .8rem 1rem */
+  font-size: .9rem;
+  color: #111827;
+  outline: none;
+}
+
+.submit {
+  border: 0;
+  padding: .65rem .9rem;       /* más pequeño */
+  font-size: .9rem;
+  font-weight: 700;
+  background: #00aa80;
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s ease;
+  white-space: nowrap;
+}
+.submit:hover { background: #009272; }
+
+/* --- Derecha en una sola línea --- */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;             /* mobile: permite salto */
+  justify-content: flex-start;
+
+  @media (min-width: 1024px) {
+    flex-wrap: nowrap;         /* desktop: todo en una línea */
+    justify-content: flex-end; /* alineado a la derecha */
+    text-align: right;
+  }
+}
+
+.links {
+  display: inline-flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.link {
+  color: #f3f4f6;
+  text-decoration: none;
+  font-weight: 500;
+  opacity: .9;
+}
+.link:hover { opacity: 1; text-decoration: underline; }
+
+.copy {
+  color: #cbd5e1;
+  font-size: .9rem;
+  @media (min-width: 1024px) {
+    padding-left: 1.25rem;
+    border-left: 1px solid rgba(255,255,255,.12);
+  }
+}
+
+/* Accesibilidad: label oculto visualmente */
+.srOnly {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}

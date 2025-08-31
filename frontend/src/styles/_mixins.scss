@@ -1,0 +1,11 @@
+@mixin shadow-card {
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+@mixin focus-ring {
+  outline: 2px solid rgba(0,170,128,.45);
+  outline-offset: 2px;
+}
