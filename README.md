@@ -232,3 +232,149 @@ export default function PostDetail() {
 
 - **API WP no responde**  
   Si usas un WordPress local, revisa que los enlaces permanentes estén configurados como “Nombre de la entrada”.
+
+
+
+# LIMITATIONS => Why this project cannot be deployed to Vercel (as it is)
+
+## 1. Dependency on WordPress + MySQL in Docker
+
+The project assumes a WordPress instance running at
+http://localhost:8080 (WP_BASE variable) and a MySQL database seeded via
+docker-compose.
+
+Vercel does not run multi-service Docker containers (docker-compose) nor
+internal database services.
+
+Your docker-compose.yml mounts ./wp-content and imports .sql seeds at
+startup --- this is stateful and relies on a persistent filesystem,
+which Vercel does not provide at runtime.
+
+## 2. Strong coupling to "localhost"
+
+In lib/blog.ts and/or wp.ts there is:
+
+    const WP_BASE = process.env.NEXT_PUBLIC_WP_BASE || "http://localhost:8080";
+
+On Vercel, localhost:8080 does not exist. If the build tries to do
+SSG/ISR against that URL, it fails (cannot reach your local WordPress
+during build or runtime).
+
+## 3. PHP and phpMyAdmin in the stack
+
+Vercel does not run PHP natively. WordPress cannot be hosted there.
+
+Instead, WordPress must live on an external host (WP Engine, Kinsta,
+Hostinger, AWS EC2/RDS, etc.), and your Next.js app should consume its
+REST API.
+
+## 4. Database seeds and state at build
+
+Your current flow assumes seeding a database (./seed/\*.sql) and having
+data preloaded for getStaticProps/generateStaticParams.
+
+On Vercel you cannot "seed" state at runtime, nor depend on local DB
+content existing during build.
+
+## 5. Filesystem writes
+
+If any code writes/reads files under wp-content (or similar), this will
+fail. Vercel's filesystem is ephemeral and not valid for persistent
+content.
+
+------------------------------------------------------------------------
+
+# Technology Stack
+
+-   **Frontend**: Next.js (App Router), React, TypeScript
+-   **Headless CMS (local dev)**: WordPress (PHP) in Docker + MySQL
+    (with SQL seeds)
+-   **Data layer**:
+    -   wp.ts: WordPress REST API calls (posts, media, slugs, etc.)
+    -   external.ts: consumption of an external API (adds "External API"
+        posts)
+    -   blog.ts: orchestrates/merges WP + external posts into unified
+        "cards"
+-   **Infrastructure (local)**: docker-compose.yml orchestrates MySQL,
+    WordPress, phpMyAdmin, with mounted wp-content and seed/ folder for
+    SQL import.
+
+------------------------------------------------------------------------
+
+# Project Structure (summary)
+
+-   `src/app/learn/page.tsx` → List view (WP + external API "cards" with
+    search/pagination)
+-   `src/app/learn/[slug]/page.tsx` → Post detail view (uses
+    generateStaticParams, generateMetadata)
+-   `src/lib/`
+    -   wp.ts → WordPress API helpers
+    -   external.ts → External API helpers
+    -   blog.ts → merged fetch, prev/next, related posts
+    -   types.ts, utils.ts → shared types/utilities
+-   `docker-compose.yml` → spins up WordPress + MySQL + phpMyAdmin
+    locally, mounts ./wp-content, imports ./seed/\*.sql.
+
+------------------------------------------------------------------------
+
+# How it works (local flow)
+
+1.  Run `docker-compose up`:
+    -   Starts MySQL, then WordPress at http://localhost:8080,
+        phpMyAdmin at http://localhost:8081
+    -   Seeds MySQL with ./seed/\*.sql so WP already has posts/media
+2.  Run Next.js dev server:
+    -   WP_BASE points to http://localhost:8080
+    -   `/learn` fetches and merges posts from WP + external API into
+        cards
+    -   `/learn/[slug]` resolves slug via WP (or external), also gets
+        prev/next and related posts
+3.  Build/SSG:
+    -   `generateStaticParams()` pulls slugs from WP
+    -   On Vercel, this breaks because localhost:8080 isn't available.
+
+------------------------------------------------------------------------
+
+# Endpoints
+
+## Consumed (data sources)
+
+-   **WordPress REST API**:
+    -   GET {WP_BASE}/wp-json/wp/v2/posts?...
+    -   GET {WP_BASE}/wp-json/wp/v2/posts?slug={slug}&\_embed
+    -   GET {WP_BASE}/wp-json/wp/v2/media/{id}
+-   **External API**:
+    -   GET {EXTERNAL_BASE}/posts?...
+    -   GET {EXTERNAL_BASE}/posts/{slug}
+
+## Exposed (UI pages)
+
+-   GET /learn → list of posts (merged WP + external)
+-   GET /learn/\[slug\] → post detail (SSG/ISR)
+
+------------------------------------------------------------------------
+
+# What you need to deploy on Vercel
+
+1.  **Host WordPress + MySQL externally** (WP Engine, Kinsta, Cloudways,
+    Hostinger, AWS EC2/RDS, etc.).
+    -   Upload wp-content/ and restore your DB there.
+2.  **Update WP_BASE**
+    -   On Vercel, set `NEXT_PUBLIC_WP_BASE=https://your-wp-domain.com`
+3.  **Avoid local filesystem/state**
+    -   Do not write/read from wp-content in Next.js.
+    -   Data must already exist in hosted WP before build.
+4.  **Consider SSR/ISR**
+    -   If posts may change frequently, use ISR (`revalidate`) or SSR
+        (`cache: no-store`).
+
+------------------------------------------------------------------------
+
+# TL;DR
+
+The blocker is that your app depends on a local Dockerized WordPress +
+MySQL.\
+Vercel cannot run those services or persist filesystem/database state.
+
+👉 To deploy: - Move WordPress to a public host - Point WP_BASE to its
+URL - Ensure no code assumes localhost or a writable FS
