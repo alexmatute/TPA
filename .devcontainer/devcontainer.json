@@ -1,19 +1,14 @@
 {
   "name": "WP Dev",
   "dockerComposeFile": "docker-compose.yml",
-  "service": "wp",
+  "service": "wordpress",
   "workspaceFolder": "/workspace",
   "forwardPorts": [8080, 8081],
-  "portsAttributes": {
-    "8080": { "label": "WordPress", "requireLocalPort": false },
-    "8081": { "label": "phpMyAdmin", "requireLocalPort": false }
-  },
-  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "postCreateCommand": "bash /workspace/.devcontainer/postCreate.sh",
+  "postStartCommand": "bash /workspace/.devcontainer/10-copy-wp-content.sh",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "ms-azuretools.vscode-docker"
-      ]
+      "extensions": ["ms-azuretools.vscode-docker"]
     }
   }
 }

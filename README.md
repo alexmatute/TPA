@@ -1,139 +1,114 @@
 # 🚀 Next.js + Tailwind + WordPress REST API
 
-Frontend en **Next.js 15 (App Router)** con **TailwindCSS**, que consume datos desde la API de **WordPress**:  
+Frontend en **Next.js 15 (App Router)** con **TailwindCSS**, consume data of API **WordPress**:  
 👉 `https://futureoffounders.com/wp-json/wp/v2/posts`
 
 ---
 
-## 📦 Requisitos
+## 📦 Required
 
 - **macOS/Linux** con:
   - [Homebrew](https://brew.sh/)  
-  - [Colima](https://github.com/abiosoft/colima) + Docker (opcional si usas WP local)
+  - [Colima](https://github.com/abiosoft/colima) + Docker (opcional if WP local)
   - Node.js (20+) + npm (10+)  
   - Git  
-
 ---
 
-## ⚡ Configuración del proyecto
+## ⚡ FRONTEND CONFIG START HERE.
+---
 
 ### 1. Clonar el repo
 ```bash
-git clone TU_REPO_URL frontend
+git clone https://github.com/alexmatute/TPA.git
 cd frontend
 ```
+---
 
 ### 2. Instalar dependencias
 ```bash
 npm install
 ```
+---
 
-### 3. Variables de entorno
-Crea un archivo `.env.local` en la raíz del proyecto:
-```env
-NEXT_PUBLIC_API_URL=https://futureoffounders.com/wp-json/wp/v2
+## ▶️ run in local fronted Next.js
+```bash
+npm run dev
 ```
+- Home → [http://localhost:3000](http://localhost:3000)  
+- Blog → [http://localhost:3000/learn/slug](http://localhost:3000/learn)
+- Blog/Details → [http://localhost:3000/learn/slug](http://localhost:3000/learn/[slug])
 
 ---
 
-## 🎨 TailwindCSS
+## ⚡ BACKEND CONFIG START HERE.
+## Install Colima with homebrew
+  ```bash
+  brew install colima docker docker-compose
+  ```
+  - Start Colima
+  ```
+  colima start
+  ```
+---
 
-Ya está configurado. Archivos clave:
+## 🐳 Deploy Backend Docker
 
-📌 `tailwind.config.js`
-```js
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: { extend: {} },
-  plugins: [],
-};
-```
+  - Rename wp-content Folder
+  - in terminal made sure be in root
+  ```bash
+  docker-compose up -d or docker compose up -d //Depend of your Alias
+  ```
+  - Show runnig procees on Docker
+  ```
+  docker compose ps
+  ```
+  - Containers
+  * wp_app (WordPress)
+  * wp_db (MySQL)
+  * wp_phpmyadmin (opcional)
 
-📌 `postcss.config.js`
-```js
-module.exports = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-    autoprefixer: {},
-  },
-};
-```
+  - Stop runnig process on Docker when you done.
+  ```
+  docker compose down -v
+  ```
+---
 
-📌 `styles/globals.css`
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
+## ⚡ IMPORT PLUGINS and Theme
+  - From folder import-wordpress move all plugin to wp-content > plugins each by one.
+  - go to dashboard > plugins >  active all (Site Navigation REST && TPA CPT - Case Study ) don't need be activate works disabled too. 
+  - from folder import-wordpress move theme twentytwentyfive-child to wp-content > themes
+  - go to dashboard > apparience > Themes active twentytwentyfive-child  
+  ---
+
+## ⚡ Plugins configuration
+  - SCF Secure Custom Fields made sure have Featured on Home	&& Home Content
+  - If not import from JSON-wordpress made sure that settings > Group setting be active && Show in REST API
+  - dummy content > generated posts > choose post type cant mark include img and click in generate.
+  - on the home page edit home Featured Posts select from case-study or post 
+  - in apparience editor navigation if there aren't one create new name main in option on the right top corner swict to code editor and copy and paste Snippet-Menu
+
+
+## Endpoints Backend 
+  * WordPress → http://localhost:8080
+  * phpMyAdmin → http://localhost:8081
+  * Usuario DB: wpuser / wppassword
+  * Root DB: root / rootpassword
+---
+
+## Wordpress Dashboard  
+   * WordPress → http://localhost:8080/wp-admin
+
+  - Usuario: admin
+  - Password: JZ!Dlf^t^mx1FJY1(E
 
 ---
 
-## 🔧 Configuración Next.js
-
-📌 `next.config.ts`
-```ts
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  images: {
-    // cualquiera de las dos sirve; dejo ambas por seguridad
-    domains: [
-      "futureoffounders.com",
-      "i0.wp.com",
-      "i1.wp.com",
-      "i2.wp.com",
-      "secure.gravatar.com",
-      "s.w.org",
-    ],
-    remotePatterns: [
-      { protocol: "https", hostname: "futureoffounders.com", pathname: "/**" },
-      { protocol: "https", hostname: "i0.wp.com", pathname: "/**" },
-      { protocol: "https", hostname: "i1.wp.com", pathname: "/**" },
-      { protocol: "https", hostname: "i2.wp.com", pathname: "/**" },
-      { protocol: "https", hostname: "secure.gravatar.com", pathname: "/**" },
-      { protocol: "https", hostname: "s.w.org", pathname: "/**" },
-    ],
-  },
-  // experimental: { turbo: { enabled: false } },
-};
-
-export default nextConfig;
 
 
-
-
-```
-
+## 📂 Pages (App Router)
 ---
 
-## 📡 API Client
-
-📌 `lib/api.ts`
-```ts
-import axios from "axios";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://futureoffounders.com/wp-json/wp/v2";
-
-export async function getPosts() {
-  const res = await axios.get(`${API_URL}/posts?per_page=6&_embed`);
-  return res.data;
-}
-
-export async function getPost(id: string | number) {
-  const res = await axios.get(`${API_URL}/posts/${id}?_embed`);
-  return res.data;
-}
-```
-
----
-
-## 📂 Páginas (App Router)
-
-### Home (listado de posts)
+### Home (show's posts)
 📌 `app/page.tsx`
 ```tsx
 "use client";
@@ -182,8 +157,9 @@ export default function Home() {
   );
 }
 ```
+---
 
-### Detalle (un post)
+### Details posts (un post)
 📌 `app/posts/[id]/page.tsx`
 ```tsx
 "use client";
@@ -227,14 +203,7 @@ export default function PostDetail() {
 
 ---
 
-## ▶️ Ejecutar en local
-```bash
-npm run dev
-```
-- Home → [http://localhost:3000](http://localhost:3000)  
-- Detalle → [http://localhost:3000/posts/ID](http://localhost:3000/posts/ID)
 
----
 
 ## 🚀 Deploy en Vercel
 
