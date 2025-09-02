@@ -1,29 +1,25 @@
-// ---- MENÚ ----
-export type MenuItem = { title: string; url: string; children?: MenuItem[] };
+// src/lib/api.ts
+import { fetchMenuServer, type WpMenuItem } from "./wp";
 
-export async function getMenuFromNavigation(slug = "main"): Promise<MenuItem[]> {
-  const res = await fetch(`/api/menu?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-
-// ---- PÁGINA + ACF ----
-export type FAQItem = { question: string; answer: string };
-export type HomeACF = {
-  hero_title?: string;
-  hero_subtitle?: string;
-  hero_primary_label?: string;
-  hero_primary_url?: string;
-  hero_secondary_label?: string;
-  hero_secondary_url?: string;
-  faqs?: FAQItem[];
+export type MenuItem = {
+  title: string;
+  href: string;
+  children?: MenuItem[];
 };
-export type PageWithACF = { id: number; slug: string; title?: any; acf?: HomeACF | null };
 
-export async function getPageBySlug(slug: string): Promise<PageWithACF | null> {
-  const res = await fetch(`/api/page?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json ?? null;
+function mapWpToMenuItem(it: WpMenuItem): MenuItem {
+  const href = (it.url || "").toString() || "#";
+  return {
+    title: (it.title || "").toString(),
+    href,
+    children: Array.isArray(it.children) ? it.children.map(mapWpToMenuItem) : [],
+  };
 }
+
+/** Compat para el Navbar existente */
+export async function getMenuFromNavigation(locationOrId: string = "main"): Promise<MenuItem[]> {
+  const items = await fetchMenuServer(locationOrId);
+  return (items || []).map(mapWpToMenuItem);
+}
+
+export { fetchMenuServer } from "./wp";

@@ -1,18 +1,21 @@
-import { getExternalBySlug, listExternal } from "./external";
-import { getWpBySlug, listWpPosts, toCard as wpToCard } from "./wp";
-
+import {
+  fetchPostBySlug,
+  getWpBySlug,
+  listCaseStudyPosts,
+  listWpPosts,
+  toBlogPost,
+  toCard as wpToCard,
+} from "./wp";
 // src/lib/blog.ts
+import { getExternalBySlug, listExternal } from "./external";
+
 import type { BlogPost } from "./types";
 import { sortByDateDesc } from "./utils";
-
-/* =====================================================================================
- * LISTA (para /app/learn/page.tsx)  — WordPress + Externa como "cards"
- * ===================================================================================*/
 
 // WP base (fallback local para dev)
 const WP_BASE = process.env.NEXT_PUBLIC_WP_BASE || "http://localhost:8080";
 
-/** Búsqueda/orden/paginación contra WP. Devuelve cards { id, href, title, excerpt, imageUrl? } */
+/** Búsqueda/orden/paginación contra WP. Devuelve cards */
 export async function fetchPosts({
   page = 1,
   perPage = 8,
@@ -55,59 +58,18 @@ export async function fetchPosts({
   return { items, page, totalPages, total, url: url.toString() } as const;
 }
 
-/** Cards desde API externa. (Demo: jsonplaceholder; adapta si tienes otra API) */
-export async function fetchExternalPosts({
-  page = 1,
-  perPage = 8,
-  q = "",
-  sort = "newest",
-}: {
-  page?: number;
-  perPage?: number;
-  q?: string;
-  sort?: "newest" | "oldest" | "title-az";
-}) {
-  const EXTERNAL_API =
-    process.env.NEXT_PUBLIC_EXTERNAL_API ||
-    "https://jsonplaceholder.typicode.com/posts";
-
-  const res = await fetch(EXTERNAL_API, { cache: "no-store" });
-  if (!res.ok) return { items: [] as any[], page, totalPages: 1, total: 0 } as const;
-
-  type ExtPost = { id: number; title: string; body: string };
-  let items = ((await res.json()) as ExtPost[]).map((p) => ({
-    id: p.id,
-    href: `/learn/${p.id}`,
-    title: String(p.title || "").trim(),
-    excerpt: String(p.body || "").slice(0, 160),
-  }));
-
-  if (q) {
-    const ql = q.toLowerCase();
-    items = items.filter(
-      (i) =>
-        i.title.toLowerCase().includes(ql) ||
-        (i.excerpt || "").toLowerCase().includes(ql)
-    );
-  }
-  if (sort === "title-az") items.sort((a, b) => a.title.localeCompare(b.title));
-  // newest/oldest no aplica aquí (sin fechas)
-
-  const start = (page - 1) * perPage;
-  const paged = items.slice(start, start + perPage);
-  const totalPages = Math.max(1, Math.ceil(items.length / perPage));
-
-  return { items: paged, page, totalPages, total: items.length } as const;
-}
-
 /* =====================================================================================
- * DETALLE (para /app/learn/[slug]/page.tsx) — Aggregator con prev/next/related
+ * DETALLE — Aggregator con prev/next/related
  * ===================================================================================*/
 
-/** Une solo WP + externos y ordena por fecha desc */
+/** Une case-study + WP (y externos si existieran) y ordena por fecha desc */
 export async function listAll(): Promise<BlogPost[]> {
-  const [ext, wp] = await Promise.all([listExternal(), listWpPosts()]);
-  return sortByDateDesc([...ext, ...wp]);
+  const [caseStudies, wp, ext] = await Promise.all([
+    listCaseStudyPosts(),
+    listWpPosts(),
+    listExternal().catch(() => []),
+  ]);
+  return sortByDateDesc([...caseStudies, ...wp, ...ext]);
 }
 
 /** Slugs de todas las fuentes */
@@ -116,13 +78,15 @@ export async function listAllSlugs(): Promise<string[]> {
   return all.map((p) => p.slug);
 }
 
-/** Busca por slug con prioridad: external → wp */
+/** Busca por slug con prioridad: external → case-study → wp */
 export async function getBySlug(slug: string): Promise<BlogPost | null> {
-  const [extPost, wpPost] = await Promise.all([
+  const [extPost, caseRow, wpPost] = await Promise.all([
     getExternalBySlug(slug),
+    fetchPostBySlug(slug, "case-study"),
     getWpBySlug(slug),
   ]);
-  return extPost || wpPost || null;
+  const casePost = caseRow ? toBlogPost(caseRow as any, "case") : null;
+  return extPost || casePost || wpPost || null;
 }
 
 /** Anterior / Siguiente dentro de la lista agregada y ordenada */
@@ -137,38 +101,20 @@ export async function getPrevNext(slug: string) {
 }
 
 /** Relacionados por tags (rellena con recientes si faltan) */
-export async function getRelated(slug: string) {
+export async function getRelated(slug: string, take = 4) {
   const all = await listAll();
   const base = all.find((p) => p.slug === slug);
-  if (!base) return all.slice(0, 3);
+  if (!base) return all.slice(0, take);
 
   const tagged = all.filter(
     (p) => p.slug !== slug && p.tags?.some((t) => base.tags?.includes(t!))
   );
 
-  if (tagged.length >= 3) return tagged.slice(0, 3);
+  if (tagged.length >= take) return tagged.slice(0, take);
 
   const fill = all
     .filter((p) => p.slug !== slug && !tagged.includes(p))
-    .slice(0, 3 - tagged.length);
+    .slice(0, take - tagged.length);
 
-  return [...tagged, ...fill].slice(0, 3);
-}
-
-/* =========================================================================
- * Sort extendido por tipo de fuente
- * ========================================================================= */
-export async function listAllSorted(
-  sort: "featured" | "post" | "case-study" | "external" | "all" = "all"
-) {
-  const [ext, wp] = await Promise.all([listExternal(), listWpPosts()]);
-  const all = [...ext, ...wp];
-
-  if (sort === "all") return sortByDateDesc(all);
-  if (sort === "featured") return all.filter((p) => (p as any).featured === true);
-  if (sort === "post") return all.filter((p) => p.source === "wp");
-  if (sort === "case-study") return all.filter((p) => p.source === "case"); // no hay por ahora
-  if (sort === "external") return all.filter((p) => p.source === "ext");
-
-  return sortByDateDesc(all);
+  return [...tagged, ...fill].slice(0, take);
 }

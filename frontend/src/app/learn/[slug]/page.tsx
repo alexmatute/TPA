@@ -1,17 +1,13 @@
 // src/app/learn/[slug]/page.tsx
-import {
-  getBySlug,
-  getPrevNext,
-  getRelated,
-  listAllSlugs
-} from "@/lib/blog";
+import { getBySlug, getPrevNext, getRelated, listAllSlugs } from "@/lib/blog";
+import { notFound, redirect } from "next/navigation";
 
+import { DEFAULT_THUMB } from "@/lib/wp";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
-// ---- Tipos tolerantes (opcional) ----
+// ---- Tipos tolerantes ----
 type PostRef = {
   slug: string;
   title: string;
@@ -28,9 +24,11 @@ type Post = PostRef & {
   dateFormatted?: string;
   seoTitle?: string;
   seoDescription?: string;
+  source?: "wp" | "ext" | "case";
+  link?: string; // para externos
 };
 
-// ---- helpers locales ----
+// ---- helpers ----
 const fmtDate = (iso?: string) => {
   if (!iso) return "";
   try {
@@ -44,7 +42,7 @@ const fmtDate = (iso?: string) => {
   }
 };
 
-// para evitar que <Image> crashee si el host no está en next.config.js
+// evitar crash de <Image> si el host no está en next.config.js
 const isAllowedHost = (url?: string) => {
   if (!url) return false;
   try {
@@ -83,7 +81,7 @@ export async function generateMetadata(
   const og =
     (post.cover && (post.cover as any)?.url) ||
     post.coverImage ||
-    "/og-default.jpg";
+    DEFAULT_THUMB;
 
   return {
     title,
@@ -108,19 +106,26 @@ export default async function LearnPostPage({ params }: { params: { slug: string
   const post = (await getBySlug(params.slug)) as Post | null;
   if (!post) return notFound();
 
-  const [{ previous, next }, relatedRaw] = await Promise.all([
-    getPrevNext?.(params.slug) || Promise.resolve({}),
+  // Si es un post externo, lo mejor es abrir el artículo original
+//  if (post.source === "ext" && post.link) {
+  //  redirect(post.link);
+ // }
+
+  // prev/next y relacionados
+  const [{ prev, next }, relatedRaw] = await Promise.all([
+    getPrevNext?.(params.slug) || Promise.resolve({ prev: null, next: null }),
     getRelated?.(params.slug, 4) || Promise.resolve([] as PostRef[]),
   ]);
 
   const related = (relatedRaw || []) as PostRef[];
 
+  // cover con fallback
   const cover =
     (post.cover && (post.cover as any)?.url) ||
     post.coverImage ||
-    undefined;
+    DEFAULT_THUMB;
 
-  // -------- Derivar autor y fecha de forma robusta --------
+  // Derivar autor/fecha de forma robusta
   const wpAny = post as any;
 
   const authorAvatar =
@@ -153,11 +158,9 @@ export default async function LearnPostPage({ params }: { params: { slug: string
   const shareUrl = `${shareUrlBase}${sharePath}` || sharePath;
 
   return (
-    // Fuerza tema claro SOLO aquí
     <div className="min-h-screen flex flex-col bg-white text-black dark:bg-white dark:text-black">
-
       <main className="flex-1">
-        {/* Breadcrumbs NEGROS */}
+        {/* Breadcrumbs */}
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-8">
           <nav className="text-sm text-black">
             <ol className="flex items-center gap-2">
@@ -172,7 +175,6 @@ export default async function LearnPostPage({ params }: { params: { slug: string
 
         {/* Hero */}
         <section className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 pt-8">
-          {/* TÍTULO NEGRO */}
           <h1 className="text-3xl md:text-5xl font-semibold leading-tight tracking-tight text-black">
             {post.title}
           </h1>
@@ -202,36 +204,42 @@ export default async function LearnPostPage({ params }: { params: { slug: string
               )}
               <div className="text-sm">
                 <div className="font-medium text-black">{authorName}</div>
-                {authorTitle && (
-                  <div className="text-black/70">{authorTitle}</div>
-                )}
+                {authorTitle && <div className="text-black/70">{authorTitle}</div>}
               </div>
             </div>
-            <div className="text-sm text-black/70">
-              {displayDate}
-            </div>
+            <div className="text-sm text-black/70">{displayDate}</div>
           </div>
 
           <div className="mt-6 h-1 w-28 rounded-full bg-emerald-500" />
         </section>
 
-        {/* Imagen destacada */}
+        {/* Imagen destacada (con fallback y seguridad de host) */}
         {cover && (
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 mt-8">
             <div className="overflow-hidden rounded-2xl">
-              <Image
-                src={cover}
-                alt={post.title}
-                width={1600}
-                height={900}
-                className="w-full h-auto object-cover"
-                priority
-              />
+              {isAllowedHost(cover) ? (
+                <Image
+                  src={cover}
+                  alt={post.title}
+                  width={1600}
+                  height={900}
+                  className="w-full h-auto object-cover"
+                  priority
+                />
+              ) : (
+                <img
+                  src={cover}
+                  alt={post.title}
+                  className="w-full h-auto object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
             </div>
           </div>
         )}
 
-        {/* Contenido en NEGRO */}
+        {/* Contenido */}
         <article
           className={[
             "mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 mt-8",
@@ -283,9 +291,9 @@ export default async function LearnPostPage({ params }: { params: { slug: string
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 mt-14">
           <div className="flex items-center justify-between border-t pt-8">
             <div>
-              {previous ? (
+              {prev ? (
                 <Link
-                  href={`/learn/${(previous as any).slug}`}
+                  href={`/learn/${(prev as any).slug}`}
                   className="group inline-flex items-center gap-2 text-emerald-700"
                 >
                   <span aria-hidden>←</span>
@@ -317,7 +325,7 @@ export default async function LearnPostPage({ params }: { params: { slug: string
             <h2 className="text-2xl md:text-3xl font-semibold text-black">Related Articles</h2>
             <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {related.map((r) => {
-                const rCover = (r as any)?.cover?.url || r.coverImage;
+                const rCover = (r as any)?.cover?.url || r.coverImage || DEFAULT_THUMB;
                 return (
                   <Link
                     key={r.slug}
@@ -326,18 +334,30 @@ export default async function LearnPostPage({ params }: { params: { slug: string
                   >
                     {rCover && (
                       <div className="overflow-hidden rounded-xl">
-                        <Image
-                          src={rCover}
-                          alt={r.title}
-                          width={640}
-                          height={360}
-                          className="w-full h-auto object-cover"
-                        />
+                        {isAllowedHost(rCover) ? (
+                          <Image
+                            src={rCover}
+                            alt={r.title}
+                            width={640}
+                            height={360}
+                            className="w-full h-auto object-cover"
+                          />
+                        ) : (
+                          <img
+                            src={rCover}
+                            alt={r.title}
+                            className="w-full h-auto object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
                       </div>
                     )}
                     <h3 className="mt-4 font-semibold line-clamp-2 text-black">{r.title}</h3>
                     {r.excerpt && (
-                      <p className="mt-2 text-sm text-black/70 line-clamp-3">{r.excerpt}</p>
+                      <p className="mt-2 text-sm text-black/70 line-clamp-3">
+                        {r.excerpt}
+                      </p>
                     )}
                     <div className="mt-4 inline-flex items-center gap-2 text-emerald-700">
                       <span>Read Case Study</span>

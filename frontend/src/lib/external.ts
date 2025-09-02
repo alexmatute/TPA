@@ -1,87 +1,115 @@
+// src/lib/external.ts
+// Fuente: WordPress externo (futureoffounders.com)
 import type { BlogPost } from "./types";
-import { stripTags } from "./utils";
 
-const EXTERNAL_API =
-  process.env.NEXT_PUBLIC_EXTERNAL_API || "https://jsonplaceholder.typicode.com/posts";
+const WP_BASE_EXTERNAL =
+  process.env.NEXT_PUBLIC_EXTERNAL_WP_BASE || "https://futureoffounders.com";
+const API_BASE_EXTERNAL = `${WP_BASE_EXTERNAL}/wp-json`;
 
-export type ExtPost = { id: number; title: string; body: string };
-
-/** ==== Generador de imágenes placeholder para posts externos ==== */
-function generatePlaceholderImage(postId: number, title: string): string {
-  // Usar Picsum para generar imágenes consistentes basadas en el ID del post
-  const seed = postId;
-  return `https://picsum.photos/seed/${seed}/800/600`;
-}
-
-/** ==== Helper para crear cover object ==== */
-function createCoverForExternal(postId: number, title: string) {
-  return {
-    url: generatePlaceholderImage(postId, title),
-    alt: `Imagen para: ${title}`,
+type WPMedia = {
+  source_url?: string;
+  alt_text?: string;
+  media_details?: {
+    sizes?: Record<string, { source_url: string; width: number; height: number }>;
   };
-}
+};
 
-export async function listExternal(): Promise<BlogPost[]> {
-  const res = await fetch(EXTERNAL_API, { next: { revalidate: 60 } });
-  if (!res.ok) return [];
-  const data: ExtPost[] = await res.json();
-  return data.slice(0, 50).map(p => ({
-    id: String(p.id),
-    slug: String(p.id), // IMPORTANT: external uses id as slug
-    source: "ext",
-    title: stripTags(p.title),
-    excerpt: stripTags(p.body).slice(0, 160),
-    content: `<p>${stripTags(p.body)}</p>`,
-    date: null,
-    cover: createCoverForExternal(p.id, p.title), // 🎯 Agregar imagen placeholder
-    tags: ["external"],
-  }));
-}
+type WpAuthor = {
+  name?: string;
+  acf?: { title?: string };
+  avatar_urls?: Record<string, string>;
+};
 
-export async function getExternalBySlug(slug: string): Promise<BlogPost | null> {
-  const res = await fetch(`${EXTERNAL_API}/${slug}`, { next: { revalidate: 60 } });
-  if (!res.ok) return null;
-  const p: ExtPost = await res.json();
-  if (!p?.id) return null;
-  return {
-    id: String(p.id),
-    slug: String(p.id),
-    source: "ext",
-    title: stripTags(p.title),
-    excerpt: stripTags(p.body).slice(0, 160),
-    content: `<p>${stripTags(p.body)}</p>`,
-    date: null,
-    cover: createCoverForExternal(p.id, p.title), // 🎯 Agregar imagen placeholder
-    tags: ["external"],
+type WpPost = {
+  id: number;
+  date: string;
+  slug: string;
+  link?: string;
+  title: { rendered: string };
+  excerpt?: { rendered: string };
+  content?: { rendered: string };
+  _embedded?: {
+    ["wp:featuredmedia"]?: WPMedia[];
+    author?: WpAuthor[];
   };
+};
+
+const stripTags = (html = "") => html.replace(/<[^>]+>/g, "").trim();
+
+function pickBestSize(m?: WPMedia) {
+  const sizes = m?.media_details?.sizes || {};
+  const preferred = sizes["large"] || sizes["medium_large"] || sizes["medium"];
+  const url = preferred?.source_url || m?.source_url || "";
+  return { url, alt: m?.alt_text || "" };
 }
 
-/** ==== Función adicional para obtener cards con imágenes ==== */
-export async function fetchExternalCards(limit: number = 10) {
-  const posts = await listExternal();
-  return posts.slice(0, limit).map(post => ({
-    id: parseInt(post.id),
-    href: `/learn/${post.slug}`,
-    title: post.title,
-    excerpt: post.excerpt,
-    imageUrl: post.cover?.url,
-    imageAlt: post.cover?.alt,
-  }));
+function coverOf(p: WpPost) {
+  const m = p._embedded?.["wp:featuredmedia"]?.[0];
+  if (!m) return undefined;
+  const { url, alt } = pickBestSize(m);
+  return url ? { url, alt } : undefined;
 }
 
-/** ==== Helper para debug ==== */
-export async function debugExternalPosts() {
+function authorOf(p: WpPost) {
+  const a = p._embedded?.author?.[0];
+  if (!a) return undefined;
+  const avatar =
+    a.avatar_urls?.["96"] || a.avatar_urls?.["48"] || a.avatar_urls?.["24"];
+  return { name: a.name || "", title: a.acf?.title || "", avatar };
+}
+
+function toBlogPost(p: WpPost): BlogPost {
+  const cover = coverOf(p);
+  const author = authorOf(p);
+  const date = p.date || "";
+  return {
+    slug: p.slug || "",
+    source: "ext",
+    title: stripTags(p.title?.rendered || ""),
+    excerpt: stripTags(p.excerpt?.rendered || ""),
+    content: p.content?.rendered || null,
+    date,
+    dateFormatted: date ? new Intl.DateTimeFormat("en-US", {
+      year: "numeric", month: "long", day: "2-digit"
+    }).format(new Date(date)) : "",
+    cover,
+    author: author as any,
+    tags: [],
+    link: p.link || `${WP_BASE_EXTERNAL}/?p=${p.id}`,
+  } as any;
+}
+
+async function fetchJSON<T>(url: string, revalidate: number | false = 60): Promise<T> {
+  const res = await fetch(url, {
+    next: typeof revalidate === "number" ? { revalidate } : undefined,
+  });
+  if (!res.ok) throw new Error(`External WP fetch ${res.status} @ ${url}`);
+  return (await res.json()) as T;
+}
+
+/** Lista de posts externos (como BlogPost) */
+export async function listExternal(limit = 100): Promise<BlogPost[]> {
   try {
-    const posts = await listExternal();
-    console.log('🔍 External posts debug:', posts.slice(0, 3).map(p => ({
-      id: p.id,
-      title: p.title,
-      coverUrl: p.cover?.url,
-      coverAlt: p.cover?.alt,
-    })));
-    return posts;
-  } catch (error) {
-    console.error('❌ Error debugging external posts:', error);
+    const rows = await fetchJSON<WpPost[]>(
+      `${API_BASE_EXTERNAL}/wp/v2/posts?per_page=${limit}&_embed=1`,
+      60
+    );
+    return rows.map(toBlogPost);
+  } catch {
     return [];
+  }
+}
+
+/** Obtener un post externo por slug */
+export async function getExternalBySlug(slug: string): Promise<BlogPost | null> {
+  try {
+    const rows = await fetchJSON<WpPost[]>(
+      `${API_BASE_EXTERNAL}/wp/v2/posts?slug=${encodeURIComponent(slug)}&_embed=1&per_page=1`,
+      60
+    );
+    const p = rows?.[0];
+    return p ? toBlogPost(p) : null;
+  } catch {
+    return null;
   }
 }

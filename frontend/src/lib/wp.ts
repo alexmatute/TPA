@@ -6,6 +6,14 @@ import { stripTags } from "./utils";
 const WP_BASE = process.env.NEXT_PUBLIC_WP_BASE || "http://localhost:8080";
 const API_BASE = `${WP_BASE}/wp-json`;
 
+// WP externo (solo usaremos /posts)
+const WP_BASE_EXTERNAL =
+  process.env.NEXT_PUBLIC_EXTERNAL_WP_BASE || "https://futureoffounders.com";
+const API_BASE_EXTERNAL = `${WP_BASE_EXTERNAL}/wp-json`;
+
+// Miniatura por defecto para cualquier item sin imagen
+export const DEFAULT_THUMB = "/og-default.jpg";
+
 /** ==== WordPress Media Type ==== */
 export type WPMedia = {
   id?: number;
@@ -55,7 +63,7 @@ export type WpPostLite = {
   };
 };
 
-/** ==== Featured Card Type ==== */
+/** ==== Featured/Card ==== */
 export type FeaturedCard = {
   id: number;
   href: string;
@@ -65,7 +73,7 @@ export type FeaturedCard = {
   imageAlt?: string;
 };
 
-/** ==== Utility Functions ==== */
+/** ==== Utils ==== */
 export const strip = (html = "") => html.replace(/<[^>]+>/g, "").trim();
 
 const fmtDate = (iso?: string) => {
@@ -81,7 +89,6 @@ const fmtDate = (iso?: string) => {
   }
 };
 
-/** Logger de desarrollo (no hace ruido en prod) */
 export function logWP(...args: any[]) {
   if (process.env.NODE_ENV !== "production") {
     // eslint-disable-next-line no-console
@@ -89,7 +96,6 @@ export function logWP(...args: any[]) {
   }
 }
 
-/** ==== Fetch helper con control de revalidate ==== */
 async function fetchJSON<T>(
   url: string,
   opts: { revalidate?: number | false } = {}
@@ -101,7 +107,7 @@ async function fetchJSON<T>(
   return (await res.json()) as T;
 }
 
-/** ==== Cover/Media Helpers ==== */
+/** ==== Media / Author ==== */
 function pickBestSize(m?: WPMedia) {
   const sizes = m?.media_details?.sizes || {};
   const preferred = sizes["large"] || sizes["medium_large"] || sizes["medium"];
@@ -121,7 +127,6 @@ function wpCover(p: WpPost | WpPostLite) {
   return best.url ? best : undefined;
 }
 
-/** ==== Author helper ==== */
 function wpAuthor(p: WpPost | WpPostLite) {
   const a = p._embedded?.author?.[0];
   if (!a) return undefined;
@@ -137,39 +142,44 @@ function wpAuthor(p: WpPost | WpPostLite) {
   };
 }
 
-/** ==== Post Type Candidates ==== */
+/** ==== Type candidates ==== */
 function candidatesFor(type: "post" | "case-study" | "external") {
   return type === "post"
     ? ["posts"]
     : type === "external"
-    ? ["external", "externals", "external-posts"]
+    ? ["external", "externals", "external-posts", "external_posts"]
     : ["case-study", "case_study", "case-studies"];
 }
 
-/** ==== Mapeos ==== */
-function toBlogPost(p: WpPost | WpPostLite): BlogPost {
+/** ==== Mapping ==== */
+export function toBlogPost(
+  p: WpPost | WpPostLite,
+  sourceOverride?: "wp" | "case" | "ext"
+): BlogPost {
   const cover = wpCover(p);
   const author = wpAuthor(p);
   const date = (p as WpPost).date || (p as WpPostLite).date || "";
 
   return {
     slug: p.slug || "",
-    source: "wp",
+    source: sourceOverride || "wp",
     title: stripTags(p.title?.rendered || ""),
     excerpt: stripTags(p.excerpt?.rendered || ""),
-    content: p.content?.rendered || null,
+    content: (p as WpPost).content?.rendered || null,
     date,
     dateFormatted: fmtDate(date),
     cover,
-    author, // <- ahora viene normalizado
+    author: author as any,
     tags: [],
-  };
+  } as any;
 }
 
-/** 👉 Export requerido por src/lib/blog.ts */
-export function wpToCard(p: WpPost, postType?: "post" | "case-study" | "external"): FeaturedCard {
+/** ==== Cards ==== */
+export function wpToCard(
+  p: WpPost,
+  _postType?: "post" | "case-study" | "external"
+): FeaturedCard {
   const cover = wpCover(p);
-  // Para case-study usamos /learn/slug (tu router ya lo espera así)
   const baseHref = `/learn/${p.slug}`;
   return {
     id: p.id,
@@ -181,8 +191,10 @@ export function wpToCard(p: WpPost, postType?: "post" | "case-study" | "external
   };
 }
 
-/** ==== Card estándar (útil para grids/carruseles) ==== */
-export function toCard(p: WpPostLite, postType?: "post" | "case-study" | "external"): FeaturedCard {
+export function toCard(
+  p: WpPostLite,
+  _postType?: "post" | "case-study" | "external"
+): FeaturedCard {
   const baseHref = `/learn/${p.slug || ""}`;
   const cover = wpCover(p);
   return {
@@ -195,7 +207,7 @@ export function toCard(p: WpPostLite, postType?: "post" | "case-study" | "extern
   };
 }
 
-/** ==== Normaliza Relationship de ACF: IDs, strings numéricas, objetos {id|ID} ==== */
+/** ==== IDs helpers ==== */
 export function normalizeIds(input: any): number[] {
   if (!Array.isArray(input)) return [];
   return input
@@ -209,7 +221,7 @@ export function normalizeIds(input: any): number[] {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
-/** ==== Fetch por IDs y tipo (preserva orden) ==== */
+/** ==== Fetchers por ID ==== */
 export async function fetchPostsByIds<T = WpPostLite>(
   ids: number[],
   type: "post" | "case-study" | "external" = "post",
@@ -227,17 +239,16 @@ export async function fetchPostsByIds<T = WpPostLite>(
       const rows = await fetchJSON<WpPostLite[]>(url, { revalidate });
       if (Array.isArray(rows) && rows.length) {
         found.push(...rows);
-        break; // primer base que funciona
+        break;
       }
-    } catch {
-      // probar siguiente candidato
-    }
+    } catch {}
   }
 
   const byId = new Map(found.map((p) => [p.id, p]));
   return unique.map((id) => byId.get(id)).filter(Boolean) as T[];
 }
 
+/** ==== Listados locales (WP base) ==== */
 /** ==== Fetch por IDs mezclando tipos (Relationship mixto) ==== */
 export async function fetchPostsByIdsMixed<T = WpPostLite>(
   ids: number[],
@@ -254,21 +265,58 @@ export async function fetchPostsByIdsMixed<T = WpPostLite>(
   for (const p of bag) byId.set(p.id, p);
   return ids.map((id) => byId.get(id)).filter(Boolean) as T[];
 }
-
-/** ==== Listado básico de posts ==== */
 export async function listWpPosts(): Promise<BlogPost[]> {
   try {
     const data = await fetchJSON<WpPost[]>(
       `${API_BASE}/wp/v2/posts?per_page=100&_embed=1`,
       { revalidate: 60 }
     );
-    return data.map(toBlogPost);
+    return data.map((p) => toBlogPost(p, "wp"));
   } catch {
     return [];
   }
 }
 
-/** ==== Post por slug (core) ==== */
+/** ==== External posts: USAR POSTS DEL SITIO EXTERNO ==== */
+/** No dependemos de un CPT ni de rest_base: solo /posts con _embed */
+export async function fetchExternalPosts({
+  limit = 8,
+  revalidate = 60,
+  requireImage = false,
+}: {
+  limit?: number;
+  revalidate?: number | false;
+  requireImage?: boolean;
+} = {}) {
+  try {
+    const url = `${API_BASE_EXTERNAL}/wp/v2/posts?per_page=${limit}&_embed=1`;
+    const rows = await fetchJSON<WpPostLite[]>(url, { revalidate });
+
+    // Si piden imagen obligatoria, filtramos por featuredmedia
+    const filtered = requireImage
+      ? rows.filter((p) => !!p._embedded?.["wp:featuredmedia"]?.[0]?.source_url)
+      : rows;
+
+    return filtered;
+  } catch {
+    return [];
+  }
+}
+
+/** ==== Case studies (WP local) ==== */
+export async function listCaseStudyPosts(): Promise<BlogPost[]> {
+  try {
+    const data = await fetchJSON<WpPost[]>(
+      `${API_BASE}/wp/v2/case-study?per_page=100&_embed=1`,
+      { revalidate: 60 }
+    );
+    return data.map((p) => toBlogPost(p, "case"));
+  } catch {
+    return [];
+  }
+}
+
+/** ==== One by slug (local WP) ==== */
 export async function getWpBySlug(slug: string): Promise<BlogPost | null> {
   try {
     const arr = await fetchJSON<WpPost[]>(
@@ -276,13 +324,29 @@ export async function getWpBySlug(slug: string): Promise<BlogPost | null> {
       { revalidate: 60 }
     );
     const p = arr?.[0];
-    return p ? toBlogPost(p) : null;
+    return p ? toBlogPost(p, "wp") : null;
   } catch {
     return null;
   }
 }
 
-/** ==== Featured (opciones) ==== */
+export async function fetchPostBySlug(
+  slug: string,
+  type: "post" | "case-study" | "external" = "post",
+  revalidate: number | false = 60
+) {
+  try {
+    const url = `${API_BASE}/wp/v2/${candidatesFor(type)[0]}?slug=${encodeURIComponent(
+      slug
+    )}&_embed=1&per_page=1`;
+    const rows = await fetchJSON<WpPostLite[]>(url, { revalidate });
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** ==== Featured (local WP) ==== */
 type FeaturedOpts = {
   type?: "post" | "case-study" | "external";
   limit?: number;
@@ -360,10 +424,7 @@ export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
     const rows = await fn();
     if (rows?.length) {
       if (requireFeaturedImage) {
-        const filtered = rows.filter(p => {
-          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
-          return !!hasMedia;
-        });
+        const filtered = rows.filter((p) => !!p._embedded?.["wp:featuredmedia"]?.[0]?.source_url);
         if (filtered.length) return filtered;
       } else {
         return rows;
@@ -373,55 +434,19 @@ export async function fetchFeaturedPosts(opts: FeaturedOpts = {}) {
   return [];
 }
 
-/** ==== Featured combinando tipos ==== */
-export async function fetchFeaturedAcrossTypes({
-  types = ["case-study", "post"] as Array<"case-study" | "post" | "external">,
+/** ==== Case studies → cards (local WP) ==== */
+export async function fetchCaseStudies({
   limit = 8,
-  via = "sticky" as "sticky" | "tag" | "category",
-  tagSlug = "featured",
-  category = "featured",
   revalidate = 60,
-  requireFeaturedImage = false,
 } = {}) {
-  const bag: WpPostLite[] = [];
-  for (const t of types) {
-    const rows = await fetchFeaturedPosts({
-      type: t,
-      limit,
-      via,
-      tagSlug,
-      category,
-      revalidate,
-      requireFeaturedImage: t === "external" ? true : requireFeaturedImage,
-    });
-    bag.push(...rows);
-  }
-  const seen = new Set<number>();
-  const out: WpPostLite[] = [];
-  for (const p of bag) {
-    if (!seen.has(p.id)) {
-      out.push(p);
-      seen.add(p.id);
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
-}
-
-/** ==== Slug único con tipo ==== */
-export async function fetchPostBySlug(
-  slug: string,
-  type: "post" | "case-study" | "external" = "post",
-  revalidate: number | false = 60
-) {
   try {
-    const url = `${API_BASE}/wp/v2/${candidatesFor(type)[0]}?slug=${encodeURIComponent(
-      slug
-    )}&_embed=1&per_page=1`;
-    const rows = await fetchJSON<WpPostLite[]>(url, { revalidate });
-    return rows?.[0] ?? null;
+    const rows = await fetchJSON<WpPostLite[]>(
+      `${API_BASE}/wp/v2/case-study?per_page=${limit}&_embed=1`,
+      { revalidate }
+    );
+    return rows.map((p) => toCard(p, "case-study"));
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -429,14 +454,14 @@ export async function fetchPostBySlug(
 export async function fetchHomeACF(slug = "home") {
   try {
     const url = `${API_BASE}/wp/v2/pages?slug=${encodeURIComponent(slug)}&_fields=acf`;
-  const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 });
+    const arr = await fetchJSON<Array<{ acf: any }>>(url, { revalidate: 0 });
     return arr?.[0] ?? null;
   } catch {
     return null;
   }
 }
 
-/** ==== Menú con fallbacks ==== */
+/** ==== Menú ==== */
 export type WpMenuItem = {
   id?: number;
   title: string;
@@ -493,125 +518,4 @@ export async function fetchMenuServer(locationOrId = "main") {
     return await fetchMenuViaCore(locationOrId);
   } catch {}
   return [];
-}
-
-/** ==== Función específica para posts externos con imagen ==== */
-export async function fetchExternalPostsWithImage({
-  limit = 10,
-  via = "sticky" as "sticky" | "tag" | "category",
-  tagSlug = "featured",
-  category = "featured",
-  revalidate = 60,
-} = {}) {
-  const candidates = ["external", "externals", "external-posts", "external_posts"];
-
-  for (const endpoint of candidates) {
-    try {
-      const url = `${API_BASE}/wp/v2/${endpoint}?per_page=${limit}&_embed=1`;
-      logWP(`Trying external endpoint: ${url}`);
-
-      const data = await fetchJSON<WpPostLite[]>(url, { revalidate });
-
-      if (Array.isArray(data) && data.length) {
-        const withImage = data.filter(p => {
-          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
-          const hasFeaturedMedia = p.featured_media && p.featured_media > 0;
-          logWP(`Post ${p.id}: hasMedia=${!!hasMedia}, featured_media=${p.featured_media}`);
-          return hasMedia || hasFeaturedMedia;
-        });
-
-        logWP(`Found ${withImage.length} external posts with images from ${endpoint}`);
-        return withImage;
-      }
-    } catch (error) {
-      logWP(`Failed to fetch from ${endpoint}:`, error);
-    }
-  }
-
-  logWP("No external posts found in any endpoint");
-  return [];
-}
-
-/** ==== Listado de posts externos (solo con imagen) ==== */
-export async function listExternalPosts(): Promise<BlogPost[]> {
-  try {
-    const data = await fetchJSON<WpPost[]>(
-      `${API_BASE}/wp/v2/external?per_page=100&_embed=1`,
-      { revalidate: 60 }
-    );
-    const withImage = data.filter(p => {
-      const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
-      return !!hasMedia;
-    });
-    return withImage.map(toBlogPost);
-  } catch {
-    try {
-      const data = await fetchJSON<WpPost[]>(
-        `${API_BASE}/wp/v2/externals?per_page=100&_embed=1`,
-        { revalidate: 60 }
-      );
-      const withImage = data.filter(p => {
-        const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
-        return !!hasMedia;
-      });
-      return withImage.map(toBlogPost);
-    } catch {
-      return [];
-    }
-  }
-}
-
-/** ==== Helpers para generar cards con tipo correcto ==== */
-export function toCardWithType(p: WpPostLite, type: "post" | "case-study" | "external"): FeaturedCard {
-  return toCard(p, type);
-}
-export function wpToCardWithType(p: WpPost, type: "post" | "case-study" | "external"): FeaturedCard {
-  return wpToCard(p, type);
-}
-
-/** ==== Fetch de case studies (automáticamente con ruta correcta) ==== */
-export async function fetchCaseStudies({
-  limit = 10,
-  via = "sticky" as "sticky" | "tag" | "category",
-  tagSlug = "featured",
-  category = "featured",
-  revalidate = 60,
-} = {}) {
-  const posts = await fetchFeaturedPosts({
-    type: "case-study",
-    limit,
-    via,
-    tagSlug,
-    category,
-    revalidate,
-  });
-
-  return posts.map(p => toCard(p, "case-study"));
-}
-
-/** ==== Helper para debug de external posts ==== */
-export async function debugExternalPosts() {
-  logWP("=== Debugging External Posts ===");
-
-  const candidates = ["external", "externals", "external-posts", "external_posts", "posts"];
-
-  for (const endpoint of candidates) {
-    try {
-      const url = `${API_BASE}/wp/v2/${endpoint}?per_page=5&_embed=1`;
-      logWP(`Testing endpoint: ${url}`);
-
-      const data = await fetchJSON<WpPostLite[]>(url, { revalidate: 0 });
-
-      if (Array.isArray(data)) {
-        logWP(`✅ ${endpoint}: Found ${data.length} posts`);
-        data.forEach(p => {
-          const hasMedia = p._embedded?.["wp:featuredmedia"]?.[0]?.source_url;
-          const featuredMedia = p.featured_media;
-          logWP(`  Post ${p.id} (${p.slug}): featured_media=${featuredMedia}, embedded_media=${!!hasMedia}`);
-        });
-      }
-    } catch (error) {
-      logWP(`❌ ${endpoint}: Error -`, error);
-    }
-  }
 }

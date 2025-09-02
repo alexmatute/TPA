@@ -1,16 +1,22 @@
-import { fetchExternalPosts, fetchPosts } from "@/lib/blog";
-import { fetchFeaturedPosts, fetchMenuServer, toCard } from "@/lib/wp";
+import {
+  DEFAULT_THUMB,
+  fetchCaseStudies,
+  fetchExternalPosts,
+  fetchFeaturedPosts,
+  fetchMenuServer,
+  toCard,
+} from "@/lib/wp";
 
 import Footer from "@/components/Footer";
-// src/app/learn/page.tsx
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Privacy from "@/components/privacy";
 import SectionHeading from "@/components/SectionHeading";
+import { fetchPosts } from "@/lib/blog";
 
 const PER_PAGE = 8;
-/* ---------------- works ---------------- */
-/* ---------------- utils ---------------- */
+
+/* utils */
 const num = (v: unknown, d = 1) => {
   const n = Number(typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined);
   return Number.isFinite(n) && n > 0 ? n : d;
@@ -18,7 +24,7 @@ const num = (v: unknown, d = 1) => {
 const str = (v: unknown, d = "") =>
   typeof v === "string" ? v : Array.isArray(v) ? v[0] || d : d;
 
-/* ---------------- presentational (reusable) ---------------- */
+/* presentational */
 function SectionTitle({
   children,
   className = "",
@@ -71,20 +77,16 @@ function CardsGrid({
             <h3 className="text-base font-semibold text-slate-900 line-clamp-2">
               {p.title}
             </h3>
-            <p className="mt-2 text-sm text-slate-600 line-clamp-3">
-              {p.excerpt}
-            </p>
-            <a
+            <p className="mt-2 text-sm text-slate-600 line-clamp-3">{p.excerpt}</p>
+            <Link
               href={p.href}
-              target="_blank"
-              rel="noreferrer"
               className="mt-4 inline-flex items-center gap-2 font-medium text-slate-900 hover:underline"
             >
               Read Case Study
               <svg width="18" height="18" viewBox="0 0 24 24" className="text-emerald-600">
                 <path d="M5 12h14M13 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2" />
               </svg>
-            </a>
+            </Link>
           </div>
         </article>
       ))}
@@ -118,9 +120,8 @@ function PageLink({
   );
 }
 
-/* ---------------- page ---------------- */
 export default async function LearnPage({
-  // Next 15: searchParams es Promise
+  // Next 15+: searchParams es Promise
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -129,26 +130,28 @@ export default async function LearnPage({
 
   const page = num(sp.page, 1);
   const q = str(sp.q, "");
-  const sort = (str(sp.sort, "newest") as "newest" | "oldest" | "title-az");
-
+  const sort = str(sp.sort, "newest") as "newest" | "oldest" | "title-az";
   const wantFeatured = !q && page === 1;
 
-  // menú
   const menu = await fetchMenuServer("main").catch(() => []);
 
-  // fetch interno + externo + featured (solo en page 1 sin búsqueda)
-  const [internal, externalRes, featuredRaw] = await Promise.all([
+  const [internal, caseStudies, externalRaw, featuredRaw] = await Promise.all([
     fetchPosts({ page, perPage: PER_PAGE, q, sort }),
-    fetchExternalPosts({ page: 1, perPage: 8, q: "", sort: "newest" }).catch(() => null),
-    wantFeatured
-      ? fetchFeaturedPosts({ type: "post", limit: 4, /* via: 'sticky' (default chain sticky->tag->cat) */ })
-      : Promise.resolve([]),
+    fetchCaseStudies({ limit: 8 }).catch(() => []),
+    // Traemos posts DEL SITIO EXTERNO (si no traen imagen, luego ponemos fallback)
+    fetchExternalPosts({ limit: 8, requireImage: false }).catch(() => []),
+    wantFeatured ? fetchFeaturedPosts({ type: "post", limit: 4 }) : Promise.resolve([]),
   ]);
 
-  const externalItems = externalRes?.items ?? [];
+  // Mapear a cards y aplicar fallback visual para miniatura
+  const externalItems = (externalRaw as any[]).map((p: any) => {
+    const card = toCard(p, "external");
+    return { ...card, imageUrl: card.imageUrl || DEFAULT_THUMB };
+  });
+
   const featured = (featuredRaw as any[])?.map(toCard) ?? [];
 
-  // deduplicar "All" removiendo lo que está en Featured
+  // dedupe internos contra featured
   const excludeIds = new Set(featured.map((f) => f.id));
   const internalItems = internal.items.filter((it) => !excludeIds.has(it.id));
 
@@ -168,7 +171,7 @@ export default async function LearnPage({
         <div className="mx-auto max-w-7xl px-[var(--site-gutter,24px)]">
           <SectionHeading eyebrow="Gorem ipsum dolor sit amet" title="Blog" as="h1" />
 
-          {/* Search + Sort (GET, sin JS) */}
+          {/* Search + Sort */}
           <form
             className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             action="/learn"
@@ -184,7 +187,7 @@ export default async function LearnPage({
               <span className="pointer-events-none absolute left-3 top-2.5 text-slate-400">
                 <svg width="20" height="20" viewBox="0 0 24 24">
                   <path
-                    d="M21 21l-4.3-4.3M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
+                    d="M21 21l-4.3-4.3M10 18a 8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
@@ -204,7 +207,6 @@ export default async function LearnPage({
                 <option value="oldest">Oldest</option>
                 <option value="title-az">Title (A–Z)</option>
               </select>
-              {/* reset page al buscar */}
               <input type="hidden" name="page" value="1" />
               <button
                 type="submit"
@@ -218,20 +220,32 @@ export default async function LearnPage({
           {/* Featured */}
           {featured.length > 0 && (
             <>
+              <div id="featured" />
               <SectionTitle>Featured Press Releases</SectionTitle>
               <CardsGrid items={featured} />
             </>
           )}
 
-          {/* External */}
+          {/* Case Studies */}
+          {caseStudies.length > 0 && (
+            <>
+              <div id="case-studies" />
+              <SectionTitle className="mt-6">Case Studies</SectionTitle>
+              <CardsGrid items={caseStudies} />
+            </>
+          )}
+
+          {/* External API */}
           {externalItems.length > 0 && (
             <>
+              <div id="external" />
               <SectionTitle className="mt-6">External API</SectionTitle>
               <CardsGrid items={externalItems} />
             </>
           )}
 
           {/* All */}
+          <div id="all-posts" />
           <SectionTitle className="mt-6">All Press Releases</SectionTitle>
           <CardsGrid items={internalItems} />
 
@@ -254,6 +268,7 @@ export default async function LearnPage({
           )}
 
           {internalItems.length === 0 &&
+            caseStudies.length === 0 &&
             externalItems.length === 0 &&
             featured.length === 0 && (
               <p className="mt-10 text-center text-slate-500">
